@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<title>Family Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+
+<!-- ONBOARDING SHEET -->
+<div class="modal" id="onboard">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="onboardTitle">Plan your month</h2>
+    <p class="sub" id="onboardSub">Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.</p>
+
+    <label class="label">Monthly income</label>
+    <input class="input num-input" id="incomeInput" type="number" min="0" step="1" placeholder="3209" />
+    <p class="help">Felix + Valeria + any benefits coming into the joint account.</p>
+
+    <label class="label">How much do you want to save?</label>
+    <input class="input num-input" id="saveInput" type="number" min="0" step="1" placeholder="100" />
+    <p class="help">This is taken off the top, before allocating to discretionary spending.</p>
+
+    <label class="label">Cofidis loan active?</label>
+    <div class="setup-row" style="padding:14px 0;border:none">
+      <span class="label-inline">€160/mo loan, ends Jun 2026</span>
+      <div class="toggle on" id="cofidisToggle" onclick="toggleCofidis()"></div>
+    </div>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeOnboard()">Cancel</button>
+      <button class="btn primary btn-block" onclick="applyOnboard()">Generate plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CATEGORY SHEET -->
+<div class="modal" id="editModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="editTitle">Edit</h2>
+    <p class="sub" id="editSub"></p>
+
+    <!-- Big remaining display -->
+    <div class="remaining-card">
+      <div>
+        <div class="rc-label">Remaining this month</div>
+        <div class="rc-val num" id="editRemaining">€0</div>
+        <div class="rc-sub" id="editRemainingSub">€0 spent of €0 budgeted</div>
+      </div>
+      <div class="rc-ring" id="editRing"></div>
+    </div>
+
+    <!-- Quick add transaction -->
+    <label class="label">Add a transaction</label>
+    <div class="entry-add">
+      <input class="input" id="entryNote" type="text" placeholder="Aldi, Q8, etc." />
+      <input class="input num-input" id="entryAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" style="width:110px" />
+      <button class="add-btn" onclick="addEntry()" style="width:44px;height:44px;border-radius:12px">+</button>
+    </div>
+    <p class="help">Date defaults to today. Tap an entry below to edit or delete it.</p>
+
+    <!-- Entries list -->
+    <div class="entries-wrap" id="entriesWrap"></div>
+
+    <details style="margin-top:18px">
+      <summary class="label" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">▸ Advanced</summary>
+      <label class="label" id="editAmountLabel">Budget amount <span id="editBudgetScope" class="small" style="font-weight:500"></span></label>
+      <input class="input num-input" id="editAmount" type="number" min="0" step="1" />
+      <p class="help" id="editBudgetHelp" style="margin-top:6px"></p>
+      <label class="label">Note</label>
+      <input class="input" id="editNote" type="text" />
+      <div class="setup-row" style="margin-top:14px;border-radius:12px;background:var(--card);border:1px solid var(--line-soft)">
+        <span class="label-inline">Locked (non-negotiable)</span>
+        <div class="toggle" id="editLock" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </details>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn danger" onclick="deleteCategory()">Delete</button>
+      <button class="btn ghost btn-block" onclick="closeEdit()">Done</button>
+      <button class="btn primary btn-block" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CATEGORY SHEET -->
+<div class="modal" id="addModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Add category</h2>
+    <p class="sub">Add a line item that's missing from the plan.</p>
+    <label class="label">Name</label>
+    <input class="input" id="addName" type="text" placeholder="e.g. Streaming subscription" />
+    <label class="label">Group</label>
+    <select class="input" id="addGroup">
+      <option value="fixed">Fixed bills</option>
+      <option value="essentials">Food &amp; essentials</option>
+      <option value="discretionary">Discretionary</option>
+    </select>
+    <label class="label">Budget amount</label>
+    <input class="input num-input" id="addAmount" type="number" min="0" step="1" placeholder="50" />
+    <div class="setup-row" style="margin-top:14px;border-radius:12px;background:var(--card);border:1px solid var(--line-soft)">
+      <span class="label-inline">Locked (non-negotiable)</span>
+      <div class="toggle" id="addLock" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeAdd()">Cancel</button>
+      <button class="btn primary btn-block" onclick="saveAdd()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTH PICKER SHEET -->
+<div class="modal" id="monthPicker">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Select month</h2>
+    <p class="sub">Tap a month to view its budget. Months with logged spend show a running total.</p>
+    <div class="month-list" id="monthList"></div>
+    <div class="btn-row" style="margin:14px 0 0">
+      <button class="btn ghost btn-block" onclick="closeMonthPicker()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <header class="top">
+    <div>
+      <div class="greeting" id="greeting">Hi Felix —</div>
+      <div class="month">Family budget</div>
+    </div>
+    <div class="avatar" aria-hidden="true">F</div>
+  </header>
+
+  <!-- Month selector (visible on every view) -->
+  <div class="month-picker" role="group" aria-label="Month selector">
+    <button class="mp-current" id="monthPickerBtn" type="button" onclick="openMonthPicker()" aria-haspopup="dialog">
+      <span class="mp-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+      </span>
+      <span class="mp-label" id="monthLabel">May 2026</span>
+      <span class="mp-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="mp-steps">
+      <button class="mp-step" id="monthPrev" type="button" onclick="stepMonth(-1)" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="mp-step" id="monthNext" type="button" onclick="stepMonth(1)" aria-label="Next month">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== HOME VIEW ===== -->
+  <section class="view active" id="view-home">
+    <div class="hero">
+      <div class="label">Available to spend</div>
+      <div class="balance num"><span id="heroAmount">€0</span></div>
+      <div class="sub">
+        <span class="pill" id="heroPill">+€0 / month</span>
+        <span id="heroNote">after fixed bills & savings</span>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="stat">
+        <div class="k">Income</div>
+        <div class="v num" id="statIncome">€0</div>
+      </div>
+      <div class="stat">
+        <div class="k">Spent</div>
+        <div class="v num" id="statSpent">€0</div>
+        <div class="delta" id="statSpentDelta"></div>
+      </div>
+      <div class="stat">
+        <div class="k">Saved</div>
+        <div class="v num" id="statSaved">€0</div>
+        <div class="delta pos" id="statSavedDelta"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Non-negotiables <span class="right" id="fixedRight">€0 / mo</span></h2>
+      <div class="card" id="fixedList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Food &amp; essentials <span class="right" id="essRight">€0 / mo</span></h2>
+      <div class="card" id="essList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Discretionary <span class="right" id="discRight">€0 / mo</span></h2>
+      <div class="card" id="discList"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn ghost btn-block" onclick="openOnboard(true)">Re-plan month</button>
+      <button class="btn primary btn-block" onclick="openAdd()">+ Add</button>
+    </div>
+
+    <div class="section" style="margin-top:24px">
+      <h2>Summary</h2>
+      <div class="card">
+        <div class="row"><div class="icon green">↓</div><div class="meta"><div class="name">Income</div><div class="note">Money in</div></div><div class="amt num" id="sumIn">€0</div></div>
+        <div class="row"><div class="icon red">↑</div><div class="meta"><div class="name">Total budgeted</div><div class="note">Fixed + essentials + discretionary</div></div><div class="amt num" id="sumOut">€0</div></div>
+        <div class="row"><div class="icon blue">★</div><div class="meta"><div class="name">Savings target</div><div class="note">Auto-transferred to emergency</div></div><div class="amt num" id="sumSave">€0</div></div>
+        <div class="row"><div class="icon amber">=</div><div class="meta"><div class="name">Slack / over-spend</div><div class="note">Income − budget − savings</div></div><div class="amt num" id="sumSlack">€0</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== BUDGET VIEW (detail with progress bars) ===== -->
+  <section class="view" id="view-budget">
+    <div class="section" style="margin-top:8px">
+      <h2><span>This month</span> <span class="right" id="budgetRight">€0 budgeted</span></h2>
+      <div class="card" id="budgetFullList"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary btn-block" onclick="openAdd()">+ Add category</button>
+    </div>
+    <div class="danger-zone">
+      <p>Reset the whole plan back to the seeded defaults (your real fixed bills + a balanced split of essentials and discretionary). Your meal plans and shopping list will be kept.</p>
+      <button class="btn ghost btn-block" onclick="resetPlan()">Reset plan</button>
+    </div>
+  </section>
+
+  <!-- ===== FOOD VIEW ===== -->
+  <section class="view" id="view-food">
+    <div class="section" style="margin-top:8px">
+      <h2>Dinner planner</h2>
+    </div>
+
+    <!-- Week selector — chevrons + tap to jump to current week -->
+    <div class="week-nav" role="group" aria-label="Week selector">
+      <button class="wn-step" id="weekPrev" type="button" onclick="stepWeek(-1)" aria-label="Previous week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="wn-current" type="button" onclick="goToCurrentWeek()" aria-label="Jump to current week">
+        <span class="wn-label" id="weekLabel">Week of …</span>
+        <span class="wn-sub" id="weekSub">This week</span>
+      </button>
+      <button class="wn-step" id="weekNext" type="button" onclick="stepWeek(1)" aria-label="Next week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+
+    <div class="section">
+      <div class="card" id="dinnerWeekCard"></div>
+    </div>
+
+    <div class="section">
+      <h2>Shopping list <span class="right" id="shopWeekRight"></span></h2>
+    </div>
+    <div class="tabs" id="shopWeekTabs">
+      <button type="button" data-week="1" class="active" onclick="setShopWeek('1')"><span class="wk-n">Week 1</span><span class="wk-d" data-range="1"></span></button>
+      <button type="button" data-week="2" onclick="setShopWeek('2')"><span class="wk-n">Week 2</span><span class="wk-d" data-range="2"></span></button>
+      <button type="button" data-week="3" onclick="setShopWeek('3')"><span class="wk-n">Week 3</span><span class="wk-d" data-range="3"></span></button>
+      <button type="button" data-week="4" onclick="setShopWeek('4')"><span class="wk-n">Week 4</span><span class="wk-d" data-range="4"></span></button>
+    </div>
+    <div class="section">
+      <div class="card">
+        <div id="shoppingList"></div>
+        <div class="add-row">
+          <input id="shopItem" placeholder="Add a product to buy" />
+          <button class="add-btn" onclick="addShopItem()">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-bottom:24px">
+      <h2>Grocery budget</h2>
+      <div class="card">
+        <div class="row">
+          <div class="icon green">🛒</div>
+          <div class="meta">
+            <div class="name">Weekly target</div>
+            <div class="note">Family of 5 — Colruyt/Aldi</div>
+          </div>
+          <div class="amt num" id="weeklyTarget">€140</div>
+        </div>
+        <div class="row">
+          <div class="icon blue">∑</div>
+          <div class="meta">
+            <div class="name">Month so far</div>
+            <div class="note">Logged grocery spend (Actual)</div>
+          </div>
+          <div class="amt num" id="monthGroceries">€0</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SETUP VIEW ===== -->
+  <section class="view" id="view-setup">
+    <div class="section" style="margin-top:8px">
+      <h2>Plan</h2>
+      <div class="card">
+        <div class="setup-row">
+          <span class="label-inline">Monthly income</span>
+          <input class="num-edit num" id="cfgIncome" type="number" min="0" />
+        </div>
+        <div class="setup-row">
+          <span class="label-inline">Savings target / mo</span>
+          <input class="num-edit num" id="cfgSavings" type="number" min="0" />
+        </div>
+        <div class="setup-row">
+          <span class="label-inline">Currency symbol</span>
+          <input class="num-edit" id="cfgCurrency" type="text" style="text-align:center;width:60px" maxlength="3" />
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Recurring obligations</h2>
+      <p class="help" style="margin:0 0 10px 4px">Tap any item to edit amount or lock status. Locked items are protected when you re-plan a month.</p>
+      <div class="card" id="setupAll"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary btn-block" onclick="saveConfig()">Save settings</button>
+    </div>
+
+    <div class="danger-zone">
+      <p><b>Reset everything</b> — clears the budget, meal plans, shopping list, and configuration. You'll go back to the onboarding screen with default values.</p>
+      <button class="btn danger btn-block" onclick="hardReset()">Wipe all data</button>
+    </div>
+
+    <div style="text-align:center;color:var(--text-dim);font-size:11px;margin:30px 0 18px;line-height:1.5">
+      Family Budget · all data stays on this device (localStorage)<br>
+      Built for the Oduro Fosu – Dos Santos Lima household.
+    </div>
+  </section>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom">
+  <button class="item active" data-view="home" onclick="setView('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 4l9 8"/><path d="M5 10v10h14V10"/></svg>
+    Home
+  </button>
+  <button class="item" data-view="budget" onclick="setView('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
+    Budget
+  </button>
+  <button class="item" data-view="food" onclick="setView('food')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 3a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3"/><path d="M18 3v18"/><path d="M16 6v5l4 1"/></svg>
+    Food
+  </button>
+  <button class="item" data-view="setup" onclick="setView('setup')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </button>
+</nav>
+
+<!-- FAB - Quick log a transaction -->
+<button class="fab" id="fab" onclick="openQuickLog()" title="Quick log transaction">+</button>
+
+<!-- Context menu for shopping items (copy / move between weeks) -->
+<div class="ctx-menu" id="ctxMenu"></div>
+
+<!-- QUICK LOG: pick a category -->
+<div class="modal" id="quickLog">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Log a transaction</h2>
+    <p class="sub">Tap a category to add an entry.</p>
+    <div class="picker-grid" id="pickerGrid"></div>
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeQuickLog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

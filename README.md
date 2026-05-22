@@ -1,20 +1,20 @@
 # Family Budget
 
-A single-file, mobile-first budgeting app built for the Oduro Fosu – Dos Santos Lima household. All data lives in `localStorage` on this device; nothing leaves the browser.
+A mobile-first budgeting app built for the Oduro Fosu – Dos Santos Lima household. All data lives in `localStorage` on this device; nothing leaves the browser.
 
 ## Run
 
-Just open the file:
+Open `index.html` directly in a browser:
 
 ```sh
-open Felix_Budget_App.html
+open index.html
 ```
 
-Or via the bundled dev server (lets you reload while editing):
+Or via the bundled dev server (so reloads pick up edits to `app.js` / `styles.css`):
 
 ```sh
 python3 -m http.server 8765
-# then visit http://localhost:8765/Felix_Budget_App.html
+# then visit http://localhost:8765/index.html
 ```
 
 ## What's inside
@@ -35,7 +35,7 @@ python3 -m http.server 8765
 
 ## Architecture
 
-Everything in one HTML file: CSS, markup, and a vanilla-JS script organised as
+Vanilla HTML / CSS / JS, no build step and no dependencies beyond Google Fonts. The script in `app.js` is organised around a one-way data flow:
 
 ```
 user event ──▶ action ──▶ commit(mutator) ──▶ save() + render()
@@ -51,8 +51,6 @@ user event ──▶ action ──▶ commit(mutator) ──▶ save() + render(
 | `render*` | pure projections of state → DOM                                        |
 | Actions   | every user command; each ends in `commit(…)`                           |
 
-No build step, no dependencies beyond Google Fonts.
-
 ## Data
 
 Persisted in `localStorage` under the key `familyBudget.v1`. To wipe everything, use **Settings → Wipe all data**.
@@ -61,7 +59,9 @@ Persisted in `localStorage` under the key `familyBudget.v1`. To wipe everything,
 
 ```
 .
-├── Felix_Budget_App.html   # the entire app
+├── index.html              # markup + modal sheets + bottom nav
+├── styles.css              # theme tokens, all components
+├── app.js                  # the single-file architecture above
 ├── .claude/launch.json     # dev-server config for the Claude Code preview
 ├── .gitignore
 └── README.md
