@@ -1,0 +1,1725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<title>Family Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d14;
+    --bg-soft:#10141d;
+    --card:#161b27;
+    --card-hi:#1d2330;
+    --card-lo:#0f131c;
+    --line:#252b3a;
+    --line-soft:#1e2433;
+    --text:#f3f5f9;
+    --text-mid:#a3acbf;
+    --text-dim:#6b748a;
+    --green:#3ee08f;
+    --green-bg:rgba(62,224,143,.12);
+    --green-dim:#226d49;
+    --red:#ff5b6a;
+    --red-bg:rgba(255,91,106,.12);
+    --amber:#f5b945;
+    --amber-bg:rgba(245,185,69,.12);
+    --blue:#5b8def;
+    --blue-bg:rgba(91,141,239,.12);
+    --purple:#a78bfa;
+    --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 8px 28px rgba(0,0,0,.45);
+    --radius:18px;
+    --radius-sm:12px;
+    --tap:44px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;font-feature-settings:'cv11','ss01';-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overscroll-behavior-y:none}
+  body{min-height:100vh;min-height:100dvh;background:radial-gradient(1200px 600px at 50% -200px,rgba(62,224,143,.06),transparent 60%),var(--bg)}
+  .app{max-width:540px;margin:0 auto;min-height:100vh;min-height:100dvh;padding-bottom:calc(168px + env(safe-area-inset-bottom));position:relative}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:'tnum'}
+
+  /* Header */
+  header.top{padding:28px 20px 12px;display:flex;align-items:center;justify-content:space-between}
+  .greeting{font-size:13px;color:var(--text-dim);font-weight:500;letter-spacing:.02em}
+  .month{font-size:22px;font-weight:700;margin-top:2px;letter-spacing:-.01em}
+  .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5b8def,#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;border:1px solid rgba(255,255,255,.1)}
+
+  /* Month selector (Rocket-Money style two-part pill) */
+  .month-picker{display:flex;align-items:stretch;gap:6px;margin:4px 16px 14px}
+  .mp-current{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;cursor:pointer;font-family:inherit;color:var(--text);text-align:left;min-height:var(--tap);transition:background .15s, border-color .15s}
+  .mp-current:active{background:var(--card-hi)}
+  .mp-current:focus-visible{outline:none;border-color:var(--green)}
+  .mp-current .mp-icon{width:28px;height:28px;border-radius:8px;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+  .mp-current .mp-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .mp-current .mp-caret{color:var(--text-dim);font-size:10px;flex-shrink:0}
+  .mp-steps{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+  .mp-step{width:44px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-mid);font-family:inherit;font-size:18px;cursor:pointer;transition:background .15s,color .15s;padding:0}
+  .mp-step:active:not(:disabled){background:var(--card-hi);color:var(--text)}
+  .mp-step:disabled{color:var(--text-dim);opacity:.35;cursor:default}
+  .mp-step + .mp-step{border-left:1px solid var(--line-soft)}
+  .mp-step svg{width:16px;height:16px}
+
+  /* Month picker sheet */
+  .month-list{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;margin-top:8px;padding:2px 2px 4px}
+  .month-cell{display:flex;align-items:center;gap:12px;padding:14px;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;cursor:pointer;transition:background .15s,border-color .15s;min-height:var(--tap)}
+  .month-cell:active{background:var(--card-hi)}
+  .month-cell.active{border-color:var(--green);background:var(--green-bg)}
+  .month-cell .mc-name{flex:1;font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .month-cell.active .mc-name{color:var(--green)}
+  .month-cell .mc-meta{font-size:12px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+  .month-cell.is-today .mc-name::after{content:" · today";color:var(--text-dim);font-weight:500;font-size:12px}
+
+  /* Hero card */
+  .hero{margin:8px 16px 16px;padding:24px 22px;border-radius:24px;background:linear-gradient(180deg,#1a2030 0%,#13182a 100%);border:1px solid var(--line-soft);position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .hero::before{content:"";position:absolute;top:-80px;right:-80px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(62,224,143,.18),transparent 65%)}
+  .hero .label{font-size:12px;color:var(--text-mid);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .hero .balance{font-size:42px;font-weight:800;margin-top:8px;letter-spacing:-.02em;line-height:1}
+  .hero .balance .cent{font-size:24px;color:var(--text-mid);font-weight:600}
+  .hero .sub{margin-top:10px;font-size:14px;color:var(--text-mid);display:flex;gap:8px;align-items:center}
+  .hero .sub .pill{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);color:var(--green);padding:4px 10px;border-radius:99px;font-weight:600;font-size:12px}
+  .hero .sub .pill.bad{background:var(--red-bg);color:var(--red)}
+
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0 16px 16px}
+  .stat{padding:14px;background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--line-soft)}
+  .stat .k{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  .stat .v{font-size:18px;font-weight:700;margin-top:6px;letter-spacing:-.01em}
+  .stat .delta{font-size:11px;font-weight:600;margin-top:2px}
+  .stat .delta.pos{color:var(--green)}
+  .stat .delta.neg{color:var(--red)}
+
+  /* Sections / cards */
+  .section{margin:8px 16px}
+  .section h2{font-size:13px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin:18px 4px 10px;display:flex;align-items:center;justify-content:space-between}
+  .section h2 .right{font-size:12px;color:var(--text-mid);font-weight:500;text-transform:none;letter-spacing:0}
+
+  .card{background:var(--card);border:1px solid var(--line-soft);border-radius:var(--radius);overflow:hidden}
+  .row{display:flex;align-items:center;padding:14px 16px;gap:12px;border-bottom:1px solid var(--line-soft);min-height:60px}
+  .row:last-child{border-bottom:none}
+  .row:active{background:var(--card-hi)}
+  .icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .icon.green{background:var(--green-bg);color:var(--green)}
+  .icon.red{background:var(--red-bg);color:var(--red)}
+  .icon.amber{background:var(--amber-bg);color:var(--amber)}
+  .icon.blue{background:var(--blue-bg);color:var(--blue)}
+  .icon.purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .icon.grey{background:rgba(255,255,255,.06);color:var(--text-mid)}
+  .row .meta{flex:1;min-width:0}
+  .row .name{font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .row .note{font-size:12px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .amt{font-size:15px;font-weight:700;letter-spacing:-.01em;text-align:right;min-width:80px}
+  .row .amt.dim{color:var(--text-mid);font-weight:600}
+  .row .lock{font-size:11px;color:var(--text-dim);margin-top:2px}
+
+  /* Progress bar (budget vs actual) */
+  .bar{height:6px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin-top:6px}
+  .bar .fill{height:100%;background:var(--green);border-radius:99px;transition:width .5s ease}
+  .bar .fill.warn{background:var(--amber)}
+  .bar .fill.over{background:var(--red)}
+
+  /* Section subtotal */
+  .subtotal{padding:14px 16px;background:var(--card-lo);display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-mid);font-weight:600;border-top:1px solid var(--line-soft)}
+  .subtotal .v{color:var(--text);font-size:15px;font-weight:700}
+
+  /* Bottom navigation */
+  nav.bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(10,13,20,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line-soft);display:flex;justify-content:space-around;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:50}
+  nav.bottom .item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;color:var(--text-dim);font-size:11px;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;transition:color .15s}
+  nav.bottom .item.active{color:var(--green)}
+  nav.bottom .item svg{width:22px;height:22px}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:14px;border:none;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:transform .1s,background .15s;min-height:var(--tap)}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--green);color:#06281a}
+  .btn.primary:hover{background:#4ce899}
+  .btn.ghost{background:var(--card-hi);color:var(--text)}
+  .btn.ghost:hover{background:#262c3c}
+  .btn.danger{background:var(--red-bg);color:var(--red)}
+  .btn-block{width:100%}
+  .btn-row{display:flex;gap:10px;margin:14px 16px 0}
+
+  /* Inputs */
+  .input{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:14px;font-family:inherit;font-size:15px;font-weight:500;outline:none;-webkit-appearance:none;appearance:none}
+  .input:focus{border-color:var(--green)}
+  .input.num-input{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;text-align:right}
+  .label{font-size:13px;color:var(--text-mid);font-weight:600;margin:14px 4px 6px;display:block}
+  .help{font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.45}
+  select.input{background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='%23a3acbf' width='12' height='8' viewBox='0 0 12 8'%3e%3cpath d='M1 1l5 5 5-5'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+
+  /* Onboarding (modal) */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:100;display:none;align-items:flex-end;justify-content:center}
+  .modal.open{display:flex}
+  .sheet{width:100%;max-width:540px;background:var(--bg-soft);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;animation:slideUp .3s ease}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet h2{margin:8px 0 6px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .sheet .sub{font-size:14px;color:var(--text-mid);margin-bottom:18px;line-height:1.45}
+  .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px}
+
+  /* Tabs (top within food page) */
+  .tabs{display:flex;gap:6px;padding:4px;background:var(--card);border-radius:12px;margin:0 16px}
+  .tabs button{flex:1;padding:8px 6px;border:none;background:transparent;color:var(--text-mid);font-family:inherit;border-radius:9px;cursor:pointer;transition:all .15s}
+  .tabs button.active{background:var(--card-hi);color:var(--text)}
+  .tabs button .wk-n{display:block;font-size:12px;font-weight:700;letter-spacing:-.01em}
+  .tabs button .wk-d{display:block;font-size:10px;font-weight:600;color:var(--text-dim);margin-top:1px;font-variant-numeric:tabular-nums}
+  .tabs button.active .wk-d{color:var(--text-mid)}
+
+  /* Right-click / long-press context menu */
+  .ctx-menu{position:fixed;z-index:90;background:var(--card-hi);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.55);padding:6px;min-width:184px;display:none}
+  .ctx-menu.open{display:block}
+  .ctx-head{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;padding:8px 10px 4px}
+  .ctx-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;width:100%;background:none;border:none;text-align:left}
+  .ctx-item:hover,.ctx-item:active{background:var(--card-lo)}
+  .ctx-sep{height:1px;background:var(--line-soft);margin:5px 4px}
+
+  /* Dinner planner — week nav */
+  .week-nav{display:flex;align-items:stretch;gap:6px;margin:4px 16px 14px}
+  .week-nav .wn-step{flex:0 0 44px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;color:var(--text-mid);font-family:inherit;cursor:pointer;padding:0;min-height:var(--tap);transition:background .15s,color .15s}
+  .week-nav .wn-step:active:not(:disabled){background:var(--card-hi);color:var(--text)}
+  .week-nav .wn-step svg{width:16px;height:16px}
+  .week-nav .wn-current{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;color:var(--text);font-family:inherit;text-align:center;cursor:pointer;padding:6px 12px;min-height:var(--tap);gap:2px;transition:background .15s, border-color .15s}
+  .week-nav .wn-current:active{background:var(--card-hi)}
+  .week-nav .wn-label{font-size:15px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .week-nav .wn-sub{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em}
+  .week-nav .wn-sub.is-current{color:var(--green)}
+
+  /* Dinner rows — one per weekday */
+  .dinner-row{display:flex;align-items:stretch;padding:12px 14px;gap:12px;border-bottom:1px solid var(--line-soft)}
+  .dinner-row:last-child{border-bottom:none}
+  .dr-day{width:46px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card-lo);border:1px solid var(--line-soft);border-radius:10px;padding:6px 0;color:var(--text)}
+  .dr-day.is-today{background:var(--green-bg);border-color:var(--green-dim);color:var(--green)}
+  .dr-day.is-past{opacity:.55}
+  .dr-dow{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;line-height:1}
+  .dr-day.is-today .dr-dow{color:var(--green)}
+  .dr-dom{font-size:18px;font-weight:700;margin-top:2px;line-height:1}
+  .dr-input{flex:1;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14px;line-height:1.45;resize:none;outline:none;min-height:44px;padding:10px 2px}
+  .dr-input::placeholder{color:var(--text-dim)}
+
+  /* Shopping list */
+  .shop-item{display:flex;align-items:center;padding:12px 16px;gap:12px;border-bottom:1px solid var(--line-soft);cursor:pointer}
+  .shop-item:last-child{border-bottom:none}
+  .check{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+  .shop-item.done .check{background:var(--green);border-color:var(--green)}
+  .shop-item.done .check::after{content:"✓";color:#06281a;font-weight:900;font-size:13px}
+  .shop-item.done .text{text-decoration:line-through;color:var(--text-dim)}
+  .shop-item .text{flex:1;font-size:14px;font-weight:500}
+
+  .add-row{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line-soft);background:var(--card-lo)}
+  .add-row input{flex:1;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+  .add-row input::placeholder{color:var(--text-dim)}
+  .add-row .add-btn{width:32px;height:32px;border-radius:8px;background:var(--green);color:#06281a;border:none;font-weight:900;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+  /* Setup page */
+  .setup-row{padding:14px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:12px}
+  .setup-row .label-inline{flex:1;font-size:14px;font-weight:500}
+  .setup-row .num-edit{width:110px;background:var(--card-lo);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;outline:none}
+  .setup-row .num-edit:focus{border-color:var(--green)}
+  .toggle{position:relative;width:42px;height:24px;background:var(--line);border-radius:99px;cursor:pointer;transition:background .2s;flex-shrink:0}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s}
+  .toggle.on{background:var(--green)}
+  .toggle.on::after{transform:translateX(18px)}
+
+  /* Empty state */
+  .empty{padding:40px 20px;text-align:center;color:var(--text-dim);font-size:14px}
+
+  .small{font-size:12px;color:var(--text-dim)}
+  .danger-zone{margin:24px 16px;padding:16px;border:1px dashed var(--red-bg);border-radius:14px}
+  .danger-zone p{margin:0 0 12px;font-size:13px;color:var(--text-mid)}
+
+  /* Hide views except active */
+  .view{display:none}
+  .view.active{display:block;animation:fadeIn .2s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  /* Edit overlay */
+  .edit-name{flex:1;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:15px;font-weight:600;outline:none}
+
+  /* Snackbar */
+  .snack{position:fixed;bottom:calc(168px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(140%);background:var(--card-hi);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:99px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);transition:transform .3s ease;z-index:80;pointer-events:none}
+  .snack.show{transform:translateX(-50%) translateY(0)}
+
+  /* Remaining display in edit modal */
+  .remaining-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px;background:linear-gradient(180deg,#1a2030 0%,#13182a 100%);border:1px solid var(--line-soft);border-radius:16px;margin-bottom:6px}
+  .rc-label{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  .rc-val{font-size:30px;font-weight:800;margin-top:4px;letter-spacing:-.02em;line-height:1}
+  .rc-val.over{color:var(--red)}
+  .rc-val.warn{color:var(--amber)}
+  .rc-val.ok{color:var(--green)}
+  .rc-sub{font-size:12px;color:var(--text-mid);margin-top:6px;font-weight:500}
+  .rc-ring{width:64px;height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text);background:conic-gradient(var(--green) 0deg, var(--line-soft) 0deg);border-radius:50%;position:relative}
+  .rc-ring::after{content:"";position:absolute;inset:6px;border-radius:50%;background:#13182a}
+  .rc-ring span{position:relative;z-index:1}
+
+  /* Quick-add entry input row */
+  .entry-add{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+  .entry-add .input{padding:12px 14px;font-size:14px}
+
+  /* Entries list */
+  .entries-wrap{margin-top:10px;border-radius:14px;border:1px solid var(--line-soft);overflow:hidden;background:var(--card)}
+  .entries-wrap:empty{display:none}
+  .entry-row{display:flex;align-items:center;padding:11px 14px;gap:10px;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .entry-row:last-child{border-bottom:none}
+  .entry-row .e-note{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .entry-row .e-date{font-size:11px;color:var(--text-dim);font-weight:500}
+  .entry-row .e-amt{font-weight:700;font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+  .entry-row .e-del{color:var(--text-dim);padding:4px 8px;cursor:pointer;font-size:16px}
+  .entry-row .e-del:hover{color:var(--red)}
+  .entries-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:13px}
+
+  /* Spent / remaining inline on rows */
+  .row .progress-line{margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .row .pl-text{font-size:12px;color:var(--text-mid);font-variant-numeric:tabular-nums}
+  .row .pl-remaining{font-size:12px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+  .row .pl-remaining.over{color:var(--red)}
+  .row .pl-remaining.warn{color:var(--amber)}
+  .row .amt-stack{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:90px}
+  .row .amt-stack .a-budget{font-size:11px;color:var(--text-dim);font-weight:500}
+  .row .amt-stack .a-spent{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+  /* Floating action button — quick log */
+  .fab{position:fixed;right:18px;bottom:96px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#06281a;border:none;font-size:30px;font-weight:300;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px rgba(62,224,143,.3),0 2px 8px rgba(0,0,0,.4);z-index:60;transition:transform .15s}
+  .fab:active{transform:scale(.94)}
+
+  /* Quick-log sheet picker */
+  .picker-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .picker-cell{padding:14px 8px;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;text-align:center;cursor:pointer;transition:all .12s}
+  .picker-cell:active{background:var(--card-hi);transform:scale(.97)}
+  .picker-cell .pc-icon{font-size:24px;margin-bottom:4px}
+  .picker-cell .pc-name{font-size:11px;font-weight:600;line-height:1.2;color:var(--text-mid)}
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING SHEET -->
+<div class="modal" id="onboard">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="onboardTitle">Plan your month</h2>
+    <p class="sub" id="onboardSub">Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.</p>
+
+    <label class="label">Monthly income</label>
+    <input class="input num-input" id="incomeInput" type="number" min="0" step="1" placeholder="3209" />
+    <p class="help">Felix + Valeria + any benefits coming into the joint account.</p>
+
+    <label class="label">How much do you want to save?</label>
+    <input class="input num-input" id="saveInput" type="number" min="0" step="1" placeholder="100" />
+    <p class="help">This is taken off the top, before allocating to discretionary spending.</p>
+
+    <label class="label">Cofidis loan active?</label>
+    <div class="setup-row" style="padding:14px 0;border:none">
+      <span class="label-inline">€160/mo loan, ends Jun 2026</span>
+      <div class="toggle on" id="cofidisToggle" onclick="toggleCofidis()"></div>
+    </div>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeOnboard()">Cancel</button>
+      <button class="btn primary btn-block" onclick="applyOnboard()">Generate plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CATEGORY SHEET -->
+<div class="modal" id="editModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="editTitle">Edit</h2>
+    <p class="sub" id="editSub"></p>
+
+    <!-- Big remaining display -->
+    <div class="remaining-card">
+      <div>
+        <div class="rc-label">Remaining this month</div>
+        <div class="rc-val num" id="editRemaining">€0</div>
+        <div class="rc-sub" id="editRemainingSub">€0 spent of €0 budgeted</div>
+      </div>
+      <div class="rc-ring" id="editRing"></div>
+    </div>
+
+    <!-- Quick add transaction -->
+    <label class="label">Add a transaction</label>
+    <div class="entry-add">
+      <input class="input" id="entryNote" type="text" placeholder="Aldi, Q8, etc." />
+      <input class="input num-input" id="entryAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" style="width:110px" />
+      <button class="add-btn" onclick="addEntry()" style="width:44px;height:44px;border-radius:12px">+</button>
+    </div>
+    <p class="help">Date defaults to today. Tap an entry below to edit or delete it.</p>
+
+    <!-- Entries list -->
+    <div class="entries-wrap" id="entriesWrap"></div>
+
+    <details style="margin-top:18px">
+      <summary class="label" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">▸ Advanced</summary>
+      <label class="label" id="editAmountLabel">Budget amount <span id="editBudgetScope" class="small" style="font-weight:500"></span></label>
+      <input class="input num-input" id="editAmount" type="number" min="0" step="1" />
+      <p class="help" id="editBudgetHelp" style="margin-top:6px"></p>
+      <label class="label">Note</label>
+      <input class="input" id="editNote" type="text" />
+      <div class="setup-row" style="margin-top:14px;border-radius:12px;background:var(--card);border:1px solid var(--line-soft)">
+        <span class="label-inline">Locked (non-negotiable)</span>
+        <div class="toggle" id="editLock" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </details>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn danger" onclick="deleteCategory()">Delete</button>
+      <button class="btn ghost btn-block" onclick="closeEdit()">Done</button>
+      <button class="btn primary btn-block" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CATEGORY SHEET -->
+<div class="modal" id="addModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Add category</h2>
+    <p class="sub">Add a line item that's missing from the plan.</p>
+    <label class="label">Name</label>
+    <input class="input" id="addName" type="text" placeholder="e.g. Streaming subscription" />
+    <label class="label">Group</label>
+    <select class="input" id="addGroup">
+      <option value="fixed">Fixed bills</option>
+      <option value="essentials">Food &amp; essentials</option>
+      <option value="discretionary">Discretionary</option>
+    </select>
+    <label class="label">Budget amount</label>
+    <input class="input num-input" id="addAmount" type="number" min="0" step="1" placeholder="50" />
+    <div class="setup-row" style="margin-top:14px;border-radius:12px;background:var(--card);border:1px solid var(--line-soft)">
+      <span class="label-inline">Locked (non-negotiable)</span>
+      <div class="toggle" id="addLock" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeAdd()">Cancel</button>
+      <button class="btn primary btn-block" onclick="saveAdd()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTH PICKER SHEET -->
+<div class="modal" id="monthPicker">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Select month</h2>
+    <p class="sub">Tap a month to view its budget. Months with logged spend show a running total.</p>
+    <div class="month-list" id="monthList"></div>
+    <div class="btn-row" style="margin:14px 0 0">
+      <button class="btn ghost btn-block" onclick="closeMonthPicker()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <header class="top">
+    <div>
+      <div class="greeting" id="greeting">Hi Felix —</div>
+      <div class="month">Family budget</div>
+    </div>
+    <div class="avatar" aria-hidden="true">F</div>
+  </header>
+
+  <!-- Month selector (visible on every view) -->
+  <div class="month-picker" role="group" aria-label="Month selector">
+    <button class="mp-current" id="monthPickerBtn" type="button" onclick="openMonthPicker()" aria-haspopup="dialog">
+      <span class="mp-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+      </span>
+      <span class="mp-label" id="monthLabel">May 2026</span>
+      <span class="mp-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="mp-steps">
+      <button class="mp-step" id="monthPrev" type="button" onclick="stepMonth(-1)" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="mp-step" id="monthNext" type="button" onclick="stepMonth(1)" aria-label="Next month">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== HOME VIEW ===== -->
+  <section class="view active" id="view-home">
+    <div class="hero">
+      <div class="label">Available to spend</div>
+      <div class="balance num"><span id="heroAmount">€0</span></div>
+      <div class="sub">
+        <span class="pill" id="heroPill">+€0 / month</span>
+        <span id="heroNote">after fixed bills & savings</span>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="stat">
+        <div class="k">Income</div>
+        <div class="v num" id="statIncome">€0</div>
+      </div>
+      <div class="stat">
+        <div class="k">Spent</div>
+        <div class="v num" id="statSpent">€0</div>
+        <div class="delta" id="statSpentDelta"></div>
+      </div>
+      <div class="stat">
+        <div class="k">Saved</div>
+        <div class="v num" id="statSaved">€0</div>
+        <div class="delta pos" id="statSavedDelta"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Non-negotiables <span class="right" id="fixedRight">€0 / mo</span></h2>
+      <div class="card" id="fixedList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Food &amp; essentials <span class="right" id="essRight">€0 / mo</span></h2>
+      <div class="card" id="essList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Discretionary <span class="right" id="discRight">€0 / mo</span></h2>
+      <div class="card" id="discList"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn ghost btn-block" onclick="openOnboard(true)">Re-plan month</button>
+      <button class="btn primary btn-block" onclick="openAdd()">+ Add</button>
+    </div>
+
+    <div class="section" style="margin-top:24px">
+      <h2>Summary</h2>
+      <div class="card">
+        <div class="row"><div class="icon green">↓</div><div class="meta"><div class="name">Income</div><div class="note">Money in</div></div><div class="amt num" id="sumIn">€0</div></div>
+        <div class="row"><div class="icon red">↑</div><div class="meta"><div class="name">Total budgeted</div><div class="note">Fixed + essentials + discretionary</div></div><div class="amt num" id="sumOut">€0</div></div>
+        <div class="row"><div class="icon blue">★</div><div class="meta"><div class="name">Savings target</div><div class="note">Auto-transferred to emergency</div></div><div class="amt num" id="sumSave">€0</div></div>
+        <div class="row"><div class="icon amber">=</div><div class="meta"><div class="name">Slack / over-spend</div><div class="note">Income − budget − savings</div></div><div class="amt num" id="sumSlack">€0</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== BUDGET VIEW (detail with progress bars) ===== -->
+  <section class="view" id="view-budget">
+    <div class="section" style="margin-top:8px">
+      <h2><span>This month</span> <span class="right" id="budgetRight">€0 budgeted</span></h2>
+      <div class="card" id="budgetFullList"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary btn-block" onclick="openAdd()">+ Add category</button>
+    </div>
+    <div class="danger-zone">
+      <p>Reset the whole plan back to the seeded defaults (your real fixed bills + a balanced split of essentials and discretionary). Your meal plans and shopping list will be kept.</p>
+      <button class="btn ghost btn-block" onclick="resetPlan()">Reset plan</button>
+    </div>
+  </section>
+
+  <!-- ===== FOOD VIEW ===== -->
+  <section class="view" id="view-food">
+    <div class="section" style="margin-top:8px">
+      <h2>Dinner planner</h2>
+    </div>
+
+    <!-- Week selector — chevrons + tap to jump to current week -->
+    <div class="week-nav" role="group" aria-label="Week selector">
+      <button class="wn-step" id="weekPrev" type="button" onclick="stepWeek(-1)" aria-label="Previous week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="wn-current" type="button" onclick="goToCurrentWeek()" aria-label="Jump to current week">
+        <span class="wn-label" id="weekLabel">Week of …</span>
+        <span class="wn-sub" id="weekSub">This week</span>
+      </button>
+      <button class="wn-step" id="weekNext" type="button" onclick="stepWeek(1)" aria-label="Next week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+
+    <div class="section">
+      <div class="card" id="dinnerWeekCard"></div>
+    </div>
+
+    <div class="section">
+      <h2>Shopping list <span class="right" id="shopWeekRight"></span></h2>
+    </div>
+    <div class="tabs" id="shopWeekTabs">
+      <button type="button" data-week="1" class="active" onclick="setShopWeek('1')"><span class="wk-n">Week 1</span><span class="wk-d" data-range="1"></span></button>
+      <button type="button" data-week="2" onclick="setShopWeek('2')"><span class="wk-n">Week 2</span><span class="wk-d" data-range="2"></span></button>
+      <button type="button" data-week="3" onclick="setShopWeek('3')"><span class="wk-n">Week 3</span><span class="wk-d" data-range="3"></span></button>
+      <button type="button" data-week="4" onclick="setShopWeek('4')"><span class="wk-n">Week 4</span><span class="wk-d" data-range="4"></span></button>
+    </div>
+    <div class="section">
+      <div class="card">
+        <div id="shoppingList"></div>
+        <div class="add-row">
+          <input id="shopItem" placeholder="Add a product to buy" />
+          <button class="add-btn" onclick="addShopItem()">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-bottom:24px">
+      <h2>Grocery budget</h2>
+      <div class="card">
+        <div class="row">
+          <div class="icon green">🛒</div>
+          <div class="meta">
+            <div class="name">Weekly target</div>
+            <div class="note">Family of 5 — Colruyt/Aldi</div>
+          </div>
+          <div class="amt num" id="weeklyTarget">€140</div>
+        </div>
+        <div class="row">
+          <div class="icon blue">∑</div>
+          <div class="meta">
+            <div class="name">Month so far</div>
+            <div class="note">Logged grocery spend (Actual)</div>
+          </div>
+          <div class="amt num" id="monthGroceries">€0</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SETUP VIEW ===== -->
+  <section class="view" id="view-setup">
+    <div class="section" style="margin-top:8px">
+      <h2>Plan</h2>
+      <div class="card">
+        <div class="setup-row">
+          <span class="label-inline">Monthly income</span>
+          <input class="num-edit num" id="cfgIncome" type="number" min="0" />
+        </div>
+        <div class="setup-row">
+          <span class="label-inline">Savings target / mo</span>
+          <input class="num-edit num" id="cfgSavings" type="number" min="0" />
+        </div>
+        <div class="setup-row">
+          <span class="label-inline">Currency symbol</span>
+          <input class="num-edit" id="cfgCurrency" type="text" style="text-align:center;width:60px" maxlength="3" />
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Recurring obligations</h2>
+      <p class="help" style="margin:0 0 10px 4px">Tap any item to edit amount or lock status. Locked items are protected when you re-plan a month.</p>
+      <div class="card" id="setupAll"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary btn-block" onclick="saveConfig()">Save settings</button>
+    </div>
+
+    <div class="danger-zone">
+      <p><b>Reset everything</b> — clears the budget, meal plans, shopping list, and configuration. You'll go back to the onboarding screen with default values.</p>
+      <button class="btn danger btn-block" onclick="hardReset()">Wipe all data</button>
+    </div>
+
+    <div style="text-align:center;color:var(--text-dim);font-size:11px;margin:30px 0 18px;line-height:1.5">
+      Family Budget · all data stays on this device (localStorage)<br>
+      Built for the Oduro Fosu – Dos Santos Lima household.
+    </div>
+  </section>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom">
+  <button class="item active" data-view="home" onclick="setView('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 4l9 8"/><path d="M5 10v10h14V10"/></svg>
+    Home
+  </button>
+  <button class="item" data-view="budget" onclick="setView('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
+    Budget
+  </button>
+  <button class="item" data-view="food" onclick="setView('food')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 3a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3"/><path d="M18 3v18"/><path d="M16 6v5l4 1"/></svg>
+    Food
+  </button>
+  <button class="item" data-view="setup" onclick="setView('setup')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </button>
+</nav>
+
+<!-- FAB - Quick log a transaction -->
+<button class="fab" id="fab" onclick="openQuickLog()" title="Quick log transaction">+</button>
+
+<!-- Context menu for shopping items (copy / move between weeks) -->
+<div class="ctx-menu" id="ctxMenu"></div>
+
+<!-- QUICK LOG: pick a category -->
+<div class="modal" id="quickLog">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Log a transaction</h2>
+    <p class="sub">Tap a category to add an entry.</p>
+    <div class="picker-grid" id="pickerGrid"></div>
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" onclick="closeQuickLog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================================
+   Family Budget — single-screen budgeting for the Oduro Fosu / Dos Santos Lima
+   household. All data lives in localStorage on this device.
+
+   Architecture — one-way data flow:
+
+       user event ──▶ action ──▶ commit(mutator) ──▶ save() + render()
+
+   • state    — single source of persisted truth (mirrors localStorage)
+   • view     — ephemeral UI state (which month/week/screen is shown)
+   • commit() — the only way state changes: mutate, persist, re-render
+   • derive   — pure read-only selectors over state
+   • fmt      — pure value formatting
+   • render*  — pure projections of state → DOM
+   • actions  — user-triggered commands; each ends in a commit() or modal op
+
+   Modules below are ordered so every name is defined before it is used.
+   ========================================================================== */
+
+/* ── 1. Constants & defaults ─────────────────────────────────────────────── */
+
+const STORE_KEY   = 'familyBudget.v1';
+const MONTH_RANGE = { back: 24, ahead: 6 };          // months reachable from the picker
+const SNACK       = { visibleMs: 3500, transitionMs: 320 };  // keep transitionMs == .snack CSS
+const SHOP_WEEK_START = { 1: 1, 2: 8, 3: 15, 4: 22 };  // week 4 runs to month-end
+
+const DEFAULTS = {
+  config: { income: 3209, savings: 100, currency: '€', cofidis: true },
+  // Real audited Belgian household figures, grouped by spend priority.
+  categories: [
+    // Fixed (locked, non-negotiable bills)
+    { id:'rent',          group:'fixed',         name:'Rent',                        note:'BE10 3300 3681 6204 — 1st of month',     budget:968, locked:true,  icon:'🏠', color:'red'   },
+    { id:'eneco',         group:'fixed',         name:'Energy (Eneco)',              note:'Monthly bill',                            budget:185, locked:true,  icon:'⚡', color:'amber' },
+    { id:'pidpa',         group:'fixed',         name:'Water (Pidpa)',               note:'Quarterly, smoothed',                     budget:75,  locked:true,  icon:'💧', color:'blue'  },
+    { id:'kbcwoning',     group:'fixed',         name:'KBC woningpolis',             note:'Renters insurance',                       budget:20,  locked:true,  icon:'🛡️', color:'blue'  },
+    { id:'kbcauto',       group:'fixed',         name:'KBC autoverzekering',         note:'Audi (Tesla via Patney BV)',              budget:46,  locked:true,  icon:'🚗', color:'blue'  },
+    { id:'kbcgezin',      group:'fixed',         name:'KBC gezinspolis',             note:'Quarterly, smoothed',                     budget:10,  locked:true,  icon:'👨‍👩‍👧', color:'blue'  },
+    { id:'mutu',          group:'fixed',         name:'Christelijke Mutualiteit',    note:'Health insurance, 2 members',             budget:20,  locked:true,  icon:'➕', color:'green' },
+    { id:'school',        group:'fixed',         name:'School / childcare',          note:'Tremelo school + Ferm + Kinderplaneet',   budget:125, locked:true,  icon:'🎒', color:'purple'},
+    { id:'gemeente',      group:'fixed',         name:'Local taxes (Tremelo)',       note:'Smoothed monthly',                        budget:48,  locked:true,  icon:'🏛️', color:'grey'  },
+    { id:'cofidis',       group:'fixed',         name:'Cofidis loan',                note:'Ends Jun 2026',                           budget:160, locked:true,  icon:'💳', color:'red'   },
+    { id:'bankunion',     group:'fixed',         name:'Bank fees / ACV-CSC',         note:'Union dues + small bank fees',            budget:14,  locked:true,  icon:'⚙️', color:'grey'  },
+    { id:'basicfit',      group:'fixed',         name:'Gym (Basic-Fit)',             note:'Cannot cancel — keep paying',             budget:23,  locked:true,  icon:'💪', color:'amber' },
+    { id:'taptap',        group:'fixed',         name:'TapTap Send (family abroad)', note:'Fixed family obligation',                 budget:110, locked:true,  icon:'🌍', color:'purple'},
+    { id:'rodekruis',     group:'fixed',         name:'Donations (Rode Kruis)',      note:'€9/mo SEPA — cannot pause',               budget:9,   locked:true,  icon:'❤️', color:'red'   },
+    { id:'funeral',       group:'fixed',         name:'Funeral funds',               note:'Family obligation — fixed',               budget:100, locked:true,  icon:'🕯️', color:'grey'  },
+    // Essentials
+    { id:'groceries',     group:'essentials',    name:'Groceries',                   note:'Family of 5 — Colruyt/Aldi',              budget:600, locked:false, icon:'🛒', color:'green' },
+    { id:'health',        group:'essentials',    name:'Health / pharmacy',           note:'Apotheek, dental, mutualiteit gap',       budget:100, locked:false, icon:'💊', color:'green' },
+    { id:'fuel',          group:'essentials',    name:'Fuel (Audi)',                 note:'Tesla via Patney BV',                     budget:70,  locked:false, icon:'⛽', color:'amber' },
+    { id:'drogist',       group:'essentials',    name:'Drogist / household',         note:'Kruidvat, Action, cleaning',              budget:50,  locked:false, icon:'🧴', color:'blue'  },
+    { id:'kids',          group:'essentials',    name:'Kids clothing (3 kids)',      note:'Recurring',                               budget:60,  locked:false, icon:'👕', color:'purple'},
+    { id:'familyp2p',     group:'essentials',    name:'Family P2P / Payconiq',       note:'Gifts, school, transfers',                budget:150, locked:false, icon:'💌', color:'purple'},
+    // Discretionary
+    { id:'restaurants',   group:'discretionary', name:'Restaurants & dining',        note:'1 family meal / 2 weeks max',             budget:80,  locked:false, icon:'🍽️', color:'amber' },
+    { id:'shopping',      group:'discretionary', name:'Online shopping',             note:'Amazon, Bol — consolidated',              budget:60,  locked:false, icon:'📦', color:'blue'  },
+    { id:'clothing',      group:'discretionary', name:'Adult clothing',              note:'One small purchase / month',              budget:30,  locked:false, icon:'👔', color:'blue'  },
+    { id:'hair',          group:'discretionary', name:'Hair (Blessco)',              note:'Every 5–6 weeks',                         budget:40,  locked:false, icon:'💇', color:'purple'},
+    { id:'atm',           group:'discretionary', name:'ATM cash',                    note:'~€30/wk max',                             budget:40,  locked:false, icon:'💶', color:'green' },
+    { id:'travel',        group:'discretionary', name:'Travel fund',                 note:'Annual trip pot',                         budget:60,  locked:false, icon:'✈️', color:'blue'  },
+    { id:'snacks',        group:'discretionary', name:'Snacks',                      note:'For wife & kids',                         budget:25,  locked:false, icon:'🍪', color:'amber' },
+    { id:'kinderplezier', group:'discretionary', name:'Kinderplezier',               note:'Books & treats for the kids',             budget:40,  locked:false, icon:'📚', color:'purple'},
+  ],
+  entries:         {},  // entries[YYYY-MM][catId] = [{ id, amount, note, date }]
+  meals:           {},  // meals[YYYY-MM-DD]       = { dinner, … }
+  shopping:        {},  // shopping[YYYY-MM][week] = [{ id, item, done }]
+  budgetOverrides: {},  // budgetOverrides[YYYY-MM][catId] = number
+  flags:           {},  // one-shot guards for migrations/seeds
+};
+
+/* ── 2. Tiny utilities ───────────────────────────────────────────────────── */
+
+const $          = id => document.getElementById(id);
+const newId      = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const escapeHtml = s  => (s || '').replace(/[&<>"']/g,
+  c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+/* ── 3. Dates ────────────────────────────────────────────────────────────── */
+
+const pad2      = n => String(n).padStart(2, '0');
+const dayKey    = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const monthKey  = d => dayKey(d).slice(0, 7);
+const today     = () => dayKey(new Date());
+const thisMonth = () => monthKey(new Date());
+
+/** Friendly label for a 'YYYY-MM' key, e.g. 'May 2026'. */
+const monthName = key =>
+  new Date(key + '-15').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+/** 'YYYY-MM' shifted by `delta` months. */
+function shiftMonth(key, delta) {
+  const [y, m] = key.split('-').map(Number);
+  return monthKey(new Date(y, m - 1 + delta, 15));
+}
+
+/** Monday 00:00 of the week containing `date`. */
+function mondayOf(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);   // Mon=0 … Sun=6
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/* ── 4. Store: state, view, persistence, commit ──────────────────────────── */
+
+/** Was localStorage empty when we loaded? Captured before migrations write to it. */
+const isFirstRun = localStorage.getItem(STORE_KEY) === null;
+
+/** Persisted application state. Mutated only inside commit(). */
+let state = load();
+
+/** Ephemeral UI state — never persisted. */
+const view = {
+  screen:   'home',
+  month:    thisMonth(),
+  week:     mondayOf(new Date()),
+  shopWeek: '1',
+  editId:   null,
+  ctxId:    null,
+};
+
+function load() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved) return {
+      ...structuredClone(DEFAULTS), ...saved,
+      config:          { ...DEFAULTS.config, ...(saved.config || {}) },
+      categories:      saved.categories?.length ? saved.categories : structuredClone(DEFAULTS.categories),
+      meals:           saved.meals           || {},
+      shopping:        saved.shopping        || {},
+      budgetOverrides: saved.budgetOverrides || {},
+      flags:           saved.flags           || {},
+    };
+  } catch { /* corrupt → fall through to defaults */ }
+  return structuredClone(DEFAULTS);
+}
+
+function save() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+/**
+ * The single entry point for state changes. Mutates, persists, re-renders.
+ * Pass `{ render:false }` for changes whose view is a live input
+ * (typing a dinner note), where re-rendering would interrupt typing.
+ */
+function commit(mutate, { render: doRender = true } = {}) {
+  mutate(state);
+  save();
+  if (doRender) render();
+}
+
+/* ── 5. Migrations: upgrade older persisted shapes ───────────────────────── */
+
+function runMigrations() {
+  migrateActuals();
+  migrateShopping();
+  seedRescueMonth();
+}
+
+/** Legacy { actuals[month][catId] = amount } → explicit entries. */
+function migrateActuals() {
+  if (!state.actuals || !Object.keys(state.actuals).length) return;
+  for (const m in state.actuals) {
+    state.entries[m] ||= {};
+    for (const catId in state.actuals[m]) {
+      const amount = +state.actuals[m][catId] || 0;
+      if (amount <= 0) continue;
+      (state.entries[m][catId] ||= []).push({
+        id: newId(), amount, note: 'Migrated total', date: m + '-15',
+      });
+    }
+  }
+  delete state.actuals;
+  save();
+}
+
+/** Shopping: flat array OR un-scoped weeks → month-scoped 4-week buckets. */
+function migrateShopping() {
+  const blank = () => ({ '1': [], '2': [], '3': [], '4': [] });
+  const clean = it => ({ id: it.id, item: it.item, done: !!it.done });
+  const s = state.shopping;
+
+  if (Array.isArray(s)) {
+    const weeks = blank();
+    weeks['1'] = s.map(clean);
+    state.shopping = { [thisMonth()]: weeks };
+    save();
+    return;
+  }
+  if (!s || typeof s !== 'object') { state.shopping = {}; return; }
+
+  const keys = Object.keys(s);
+  const isUnscoped = keys.length > 0 && keys.every(k => ['1','2','3','4'].includes(k));
+  if (isUnscoped) {
+    const weeks = blank();
+    for (const w of ['1','2','3','4']) weeks[w] = (s[w] || []).map(clean);
+    state.shopping = { [thisMonth()]: weeks };
+    save();
+    return;
+  }
+  // Already month-scoped — normalize items and ensure all 4 weeks exist
+  for (const m in s) {
+    const month = s[m] || {};
+    for (const w of ['1','2','3','4']) month[w] = (month[w] || []).map(clean);
+    s[m] = month;
+  }
+}
+
+/** One-shot seed: the May 2026 cashflow-rescue plan from the Numbers sheet. */
+function seedRescueMonth() {
+  if (state.flags.may2026rescue) return;
+
+  const ensure = cat => {
+    if (!state.categories.find(c => c.id === cat.id)) state.categories.push(cat);
+  };
+  ensure({ id:'funeral',       group:'fixed',         name:'Funeral funds', note:'Family obligation — fixed',   budget:100, locked:true,  icon:'🕯️', color:'grey'   });
+  ensure({ id:'snacks',        group:'discretionary', name:'Snacks',        note:'For wife & kids',             budget:25,  locked:false, icon:'🍪', color:'amber'  });
+  ensure({ id:'kinderplezier', group:'discretionary', name:'Kinderplezier', note:'Books & treats for the kids', budget:40,  locked:false, icon:'📚', color:'purple' });
+
+  const seed = [ /* [catId, amount, note, day] */
+    ['rent',          968.05, 'Rent — 1 May',                                  1],
+    ['eneco',         184.46, 'Eneco — April catch-up (deferred bill)',        5],
+    ['pidpa',         226.00, 'Pidpa water — single-month payment',            8],
+    ['kbcwoning',      19.82, 'KBC woningpolis (May premium)',                 5],
+    ['school',         47.88, 'Childcare — OCMW',                              5],
+    ['school',         29.00, 'School kids — Klimboom',                       10],
+    ['cofidis',       160.13, 'Cofidis loan — one of last instalments',        5],
+    ['bankunion',      13.83, 'Bank fees + ACV-CSC',                           5],
+    ['groceries',     571.60, 'Groceries (compressed, discount-store run)',   15],
+    ['health',         28.05, 'Pharmacy — necessities only',                  10],
+    ['fuel',           70.04, 'Fuel — Audi',                                   8],
+    ['drogist',        39.18, 'Drogist / household — bare necessities',       12],
+    ['kids',           20.00, "Kids' clothes",                                15],
+    ['familyp2p',      10.00, 'Family P2P — essentials only',                 12],
+    ['funeral',       100.00, 'Funeral funds',                                 5],
+    ['snacks',          1.79, 'Snacks for the kids',                          14],
+    ['basicfit',       23.00, 'Gym (Basic-Fit) — cannot cancel',               1],
+    ['atm',            40.00, 'ATM cash — tight cap',                         10],
+    ['taptap',        110.00, 'TapTap Send — family abroad',                   5],
+    ['rodekruis',       9.00, 'Rode Kruis SEPA',                               5],
+    ['kinderplezier',  33.90, 'Books for the kids',                           18],
+  ];
+  state.entries['2026-05'] ||= {};
+  for (const [catId, amount, note, day] of seed) {
+    (state.entries['2026-05'][catId] ||= []).push({
+      id: newId(), amount, note, date: `2026-05-${pad2(day)}`,
+    });
+  }
+  state.flags.may2026rescue = true;
+  save();
+}
+
+/* ── 6. Derive: pure selectors over state ────────────────────────────────── */
+
+const derive = {
+  entries(catId, month = view.month) {
+    return state.entries?.[month]?.[catId] || [];
+  },
+  spent(catId, month = view.month) {
+    return derive.entries(catId, month).reduce((sum, e) => sum + (+e.amount || 0), 0);
+  },
+
+  /** Effective budget for a category in a month: per-month override or global default. */
+  budget(cat, month = view.month) {
+    if (!cat) return 0;
+    if (cat.id === 'cofidis' && !state.config.cofidis) return 0;
+    const o = state.budgetOverrides?.[month]?.[cat.id];
+    return o != null ? +o : (+cat.budget || 0);
+  },
+  budgetById(catId, month) {
+    return derive.budget(state.categories.find(c => c.id === catId), month);
+  },
+  hasOverride(catId, month = view.month) {
+    return state.budgetOverrides?.[month]?.[catId] !== undefined;
+  },
+
+  /** Group totals + total spend for a month. */
+  totals(month = view.month) {
+    const t = { fixed: 0, ess: 0, disc: 0, spent: 0 };
+    const bucket = { fixed: 'fixed', essentials: 'ess', discretionary: 'disc' };
+    for (const cat of state.categories) {
+      t[bucket[cat.group]] += derive.budget(cat, month);
+      t.spent += derive.spent(cat.id, month);
+    }
+    t.budgeted = t.fixed + t.ess + t.disc;
+    return t;
+  },
+
+  /** Inclusive [min,max] month keys the picker may travel to. */
+  monthBounds() {
+    return {
+      min: shiftMonth(thisMonth(), -MONTH_RANGE.back),
+      max: shiftMonth(thisMonth(),  MONTH_RANGE.ahead),
+    };
+  },
+
+  /** Spend status of a budget line: { pct (capped 0..100), rawPct, status }. */
+  progress(spent, budget) {
+    const rawPct = budget > 0 ? Math.round(spent / budget * 100) : 0;
+    const pct    = Math.min(100, rawPct);
+    const status = spent > budget ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    return { pct, rawPct, status };
+  },
+
+  /** Calendar day range of a shopping-list week within a month. */
+  shopWeekRange(week, month = view.month) {
+    const [y, m] = month.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const start = SHOP_WEEK_START[week];
+    return { start, end: String(week) === '4' ? lastDay : start + 6 };
+  },
+};
+
+/* ── 7. Format ───────────────────────────────────────────────────────────── */
+
+/** Money, e.g. 1234.5 → '€1,234.5'; negatives use a real minus sign. */
+function fmt(n) {
+  const sign = n < 0 ? '−' : '';
+  const abs  = Math.abs(n);
+  const digits = abs % 1 ? 2 : 0;
+  return sign + (state.config.currency || '€') +
+    abs.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: 2 });
+}
+
+/* ── 8. Views: state → DOM ───────────────────────────────────────────────── */
+
+function render() {
+  renderHeaderPicker();
+  renderHome();
+  renderBudgetView();
+  renderSetupView();
+  renderFoodView();
+  if (view.editId) renderEditSheet();
+}
+
+function renderHeaderPicker() {
+  $('monthLabel').textContent = monthName(view.month);
+  const { min, max } = derive.monthBounds();
+  $('monthPrev').disabled = view.month <= min;
+  $('monthNext').disabled = view.month >= max;
+}
+
+function renderHome() {
+  const t = derive.totals();
+  const income    = +state.config.income  || 0;
+  const savings   = +state.config.savings || 0;
+  const remaining = t.budgeted - t.spent;
+
+  $('heroAmount').textContent = fmt(remaining);
+  const pill = $('heroPill');
+  pill.classList.toggle('bad', remaining < 0);
+  pill.textContent = remaining >= 0 ? `${fmt(t.spent)} spent` : `${fmt(-remaining)} over`;
+  $('heroNote').textContent = remaining >= 0 ? `of ${fmt(t.budgeted)} budgeted` : 'budget exceeded';
+
+  $('statIncome').textContent = fmt(income);
+  $('statSpent').textContent  = fmt(t.spent);
+  $('statSaved').textContent  = fmt(savings);
+  const delta = $('statSpentDelta');
+  delta.textContent = remaining >= 0 ? `${fmt(remaining)} left` : `${fmt(-remaining)} over`;
+  delta.className   = 'delta ' + (remaining >= 0 ? 'pos' : 'neg');
+
+  $('fixedRight').textContent = fmt(t.fixed);
+  $('essRight').textContent   = fmt(t.ess);
+  $('discRight').textContent  = fmt(t.disc);
+  $('fixedList').innerHTML = categoryRows(state.categories.filter(c => c.group === 'fixed'));
+  $('essList').innerHTML   = categoryRows(state.categories.filter(c => c.group === 'essentials'));
+  $('discList').innerHTML  = categoryRows(state.categories.filter(c => c.group === 'discretionary'));
+
+  $('sumIn').textContent    = fmt(income);
+  $('sumOut').textContent   = fmt(t.budgeted);
+  $('sumSave').textContent  = fmt(savings);
+  $('sumSlack').textContent = fmt(income - t.budgeted - savings);
+}
+
+function renderBudgetView() {
+  const t = derive.totals();
+  $('budgetRight').textContent  = `${fmt(t.spent)} / ${fmt(t.budgeted)}`;
+  $('budgetFullList').innerHTML = categoryRows(state.categories);
+}
+
+function renderSetupView() {
+  $('cfgIncome').value    = state.config.income;
+  $('cfgSavings').value   = state.config.savings;
+  $('cfgCurrency').value  = state.config.currency;
+  $('setupAll').innerHTML = categoryRows(state.categories);
+}
+
+/** One row per category, with progress bar and spend stats. */
+function categoryRows(cats) {
+  if (!cats.length) return '<div class="empty">Nothing here yet</div>';
+  return cats.map(cat => {
+    const budget = derive.budget(cat);
+    const spent  = derive.spent(cat.id);
+    const { pct, status } = derive.progress(spent, budget);
+    const remaining = budget - spent;
+    const txns = derive.entries(cat.id).length;
+
+    const lock = cat.locked ? '🔒' : '';
+    const text = cat.note ? escapeHtml(cat.note) + (lock ? ' · ' + lock : '') : lock;
+    const note = text ? `<div class="note">${text}</div>` : '';
+
+    const txnTag = txns
+      ? ` <span style="color:var(--green);font-weight:700">· ${txns} ${txns === 1 ? 'entry' : 'entries'}</span>`
+      : '';
+    const cls = status === 'ok' ? '' : status;
+    const progress = budget > 0 ? `
+        <div class="bar"><div class="fill ${cls}" style="width:${pct}%"></div></div>
+        <div class="progress-line">
+          <span class="pl-text">${fmt(spent)} of ${fmt(budget)}${txnTag}</span>
+          <span class="pl-remaining ${cls}">${remaining >= 0 ? fmt(remaining) + ' left' : fmt(-remaining) + ' over'}</span>
+        </div>` : '';
+
+    return `<div class="row" onclick="openEdit('${cat.id}')">
+      <div class="icon ${cat.color || 'grey'}">${cat.icon || '•'}</div>
+      <div class="meta">
+        <div class="name">${escapeHtml(cat.name)}</div>
+        ${note}
+        ${progress}
+      </div>
+      <div class="amt-stack">
+        <div class="a-spent">${fmt(spent)}</div>
+        <div class="a-budget">/ ${fmt(budget)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFoodView() {
+  renderWeekNav();
+  renderDinnerWeek();
+  renderShopTabs();
+  renderShoppingList();
+  $('monthGroceries').textContent = fmt(derive.spent('groceries'));
+  $('weeklyTarget').textContent   = fmt(Math.round(derive.budgetById('groceries') / 4.33));
+}
+
+function renderWeekNav() {
+  const start = view.week;
+  const end = new Date(start); end.setDate(end.getDate() + 6);
+  const startLbl = start.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  const endLbl   = start.getMonth() === end.getMonth()
+    ? end.toLocaleString('en-US', { day: 'numeric' })
+    : end.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  $('weekLabel').textContent = `${startLbl} – ${endLbl}, ${start.getFullYear()}`;
+
+  const offset = Math.round((start - mondayOf(new Date())) / (7 * 86400000));
+  const sub = $('weekSub');
+  sub.textContent = relativeWeekLabel(offset);
+  sub.classList.toggle('is-current', offset === 0);
+}
+function relativeWeekLabel(n) {
+  if (n === 0)  return 'This week';
+  if (n === -1) return 'Last week';
+  if (n === 1)  return 'Next week';
+  return n < 0 ? `${-n} weeks ago` : `In ${n} weeks`;
+}
+
+function renderDinnerWeek() {
+  const todayKey = today();
+  const rows = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(view.week); d.setDate(d.getDate() + i);
+    const key  = dayKey(d);
+    const when = key === todayKey ? 'is-today' : key < todayKey ? 'is-past' : '';
+    const dinner = state.meals?.[key]?.dinner || '';
+    return `<div class="dinner-row">
+      <div class="dr-day ${when}">
+        <div class="dr-dow">${d.toLocaleString('en-US', { weekday: 'short' })}</div>
+        <div class="dr-dom">${d.getDate()}</div>
+      </div>
+      <textarea class="dr-input" data-date="${key}" oninput="saveDinner(this)" placeholder="What's for dinner?" rows="1">${escapeHtml(dinner)}</textarea>
+    </div>`;
+  }).join('');
+  $('dinnerWeekCard').innerHTML = rows;
+  $('dinnerWeekCard').querySelectorAll('.dr-input').forEach(autoGrow);
+}
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function renderShopTabs() {
+  for (const btn of document.querySelectorAll('#shopWeekTabs button')) {
+    btn.classList.toggle('active', btn.dataset.week === view.shopWeek);
+  }
+  for (const el of document.querySelectorAll('#shopWeekTabs .wk-d')) {
+    const r = derive.shopWeekRange(el.dataset.range);
+    el.textContent = `${r.start}–${r.end}`;
+  }
+}
+
+function renderShoppingList() {
+  const list = state.shopping?.[view.month]?.[view.shopWeek] || [];
+  const bought = list.filter(it => it.done).length;
+  $('shopWeekRight').textContent = list.length ? `${bought}/${list.length} bought` : '';
+
+  if (!list.length) {
+    const r = derive.shopWeekRange(view.shopWeek);
+    const mon = monthName(view.month).split(' ')[0];
+    $('shoppingList').innerHTML =
+      `<div class="empty">Nothing for Week ${view.shopWeek} (${mon} ${r.start}–${r.end}) yet — add a product below.</div>`;
+    return;
+  }
+  $('shoppingList').innerHTML = list.map(it => `
+    <div class="shop-item ${it.done ? 'done' : ''}" onclick="toggleShop('${it.id}')" oncontextmenu="openShopMenu(event,'${it.id}')">
+      <div class="check"></div>
+      <div class="text">${escapeHtml(it.item)}</div>
+      <div onclick="event.stopPropagation();removeShop('${it.id}')" style="color:var(--text-dim);padding:0 4px;font-size:18px;cursor:pointer">×</div>
+    </div>`).join('');
+}
+
+function renderEditSheet() {
+  const cat = editingCategory(); if (!cat) return;
+  const budget = derive.budget(cat);
+  const spent  = derive.spent(cat.id);
+  const { pct, status } = derive.progress(spent, budget);
+
+  $('editTitle').textContent = cat.name;
+  $('editSub').textContent   = cat.group[0].toUpperCase() + cat.group.slice(1);
+  $('editRemaining').textContent  = fmt(budget - spent);
+  $('editRemaining').className    = 'rc-val num ' + status;
+  $('editRemainingSub').textContent = `${fmt(spent)} spent of ${fmt(budget)} budgeted`;
+
+  const ringColor = status === 'over' ? 'var(--red)' : status === 'warn' ? 'var(--amber)' : 'var(--green)';
+  const ringDeg   = pct * 3.6;
+  $('editRing').style.background = `conic-gradient(${ringColor} ${ringDeg}deg, var(--line-soft) ${ringDeg}deg)`;
+  $('editRing').innerHTML        = `<span>${pct}%</span>`;
+
+  renderEditEntries(cat);
+  renderEditBudgetScope(cat);
+}
+
+function renderEditEntries(cat) {
+  const entries = derive.entries(cat.id).slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  $('entriesWrap').innerHTML = entries.length
+    ? entries.map(e => {
+        const date = e.date
+          ? new Date(e.date + 'T00:00').toLocaleString('en-US', { month: 'short', day: 'numeric' })
+          : '';
+        return `<div class="entry-row">
+        <div class="e-note">${escapeHtml(e.note || '(no note)')}</div>
+        <div class="e-date">${date}</div>
+        <div class="e-amt num">${fmt(+e.amount)}</div>
+        <div class="e-del" onclick="event.stopPropagation();deleteEntry('${e.id}')">×</div>
+      </div>`;
+      }).join('')
+    : '<div class="entries-empty">No entries yet — add the first transaction above.</div>';
+}
+
+function renderEditBudgetScope(cat) {
+  const monthLbl = monthName(view.month);
+  if (derive.hasOverride(cat.id)) {
+    $('editBudgetScope').innerHTML = `· <span style="color:var(--amber)">Custom for ${escapeHtml(monthLbl)}</span>`;
+    $('editBudgetHelp').innerHTML  =
+      `Default is ${fmt(+cat.budget || 0)}. <a href="#" onclick="resetMonthBudget(event)" style="color:var(--green);text-decoration:underline">Reset to default</a>`;
+  } else {
+    $('editBudgetScope').innerHTML = `· <span style="color:var(--text-dim)">${escapeHtml(monthLbl)} only</span>`;
+    $('editBudgetHelp').textContent = `Edits apply to ${monthLbl} only. Other months keep their own budget.`;
+  }
+}
+
+function editingCategory() {
+  return state.categories.find(c => c.id === view.editId) || null;
+}
+
+/* ── 9. Actions — the only callers of commit() ──────────────────────────── */
+/* Every function in this section is reachable from an HTML inline handler;
+   they all stay as top-level `function` declarations so the browser exposes
+   them as globals automatically. */
+
+const openModal  = id => $(id).classList.add('open');
+const closeModal = id => $(id).classList.remove('open');
+
+/* -- Screen navigation ---------------------------------------------------- */
+
+function setView(screen) {
+  view.screen = screen;
+  for (const el of document.querySelectorAll('.view'))
+    el.classList.toggle('active', el.id === 'view-' + screen);
+  for (const el of document.querySelectorAll('nav.bottom .item'))
+    el.classList.toggle('active', el.dataset.view === screen);
+  render();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/* -- Onboarding & re-plan ------------------------------------------------- */
+
+function openOnboard(replan) {
+  $('onboardTitle').textContent = replan ? 'Re-plan this month' : 'Plan your month';
+  $('onboardSub').textContent = replan
+    ? "Adjust income or savings and I'll rebalance discretionary lines while keeping your locked bills."
+    : "Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.";
+  $('incomeInput').value = state.config.income || '';
+  $('saveInput').value   = state.config.savings || '';
+  $('cofidisToggle').classList.toggle('on', !!state.config.cofidis);
+  openModal('onboard');
+}
+function closeOnboard()  { closeModal('onboard'); }
+function toggleCofidis() { $('cofidisToggle').classList.toggle('on'); }
+
+function applyOnboard() {
+  const income  = +$('incomeInput').value || 0;
+  const savings = +$('saveInput').value   || 0;
+  const cofidis = $('cofidisToggle').classList.contains('on');
+  commit(s => {
+    s.config.income   = income;
+    s.config.savings  = savings;
+    s.config.cofidis  = cofidis;
+    rebalanceMonth(s, view.month, income, savings);
+  });
+  closeOnboard();
+  snack(`${monthName(view.month)} rebalanced`);
+}
+
+/** Per-month override helpers used by saveEdit, resetMonthBudget, rebalance. */
+function setOverride(s, catId, month, value) {
+  const cat = s.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const v = +value || 0;
+  if (v === (+cat.budget || 0)) {
+    // Matches the default — no override needed
+    if (s.budgetOverrides[month]) {
+      delete s.budgetOverrides[month][catId];
+      if (!Object.keys(s.budgetOverrides[month]).length) delete s.budgetOverrides[month];
+    }
+  } else {
+    (s.budgetOverrides[month] ||= {})[catId] = v;
+  }
+}
+function clearOverride(s, catId, month) {
+  if (!s.budgetOverrides[month]) return;
+  delete s.budgetOverrides[month][catId];
+  if (!Object.keys(s.budgetOverrides[month]).length) delete s.budgetOverrides[month];
+}
+
+/** Target weights for the rebalance algorithm — sum essentials = 1030, disc = 375. */
+const FLEX_DEFAULTS = {
+  essentials:    { groceries:600, health:100, fuel:70, drogist:50, kids:60, familyp2p:150 },
+  discretionary: { restaurants:80, shopping:60, clothing:30, hair:40, atm:40, travel:60, snacks:25, kinderplezier:40 },
+};
+
+/** Auto-balance flex categories for one month to fit (income − savings − locked). */
+function rebalanceMonth(s, month, income, savings) {
+  const set = (catId, value) => setOverride(s, catId, month, value);
+  const sumValues = obj => Object.values(obj).reduce((a, b) => a + b, 0);
+
+  const lockedTotal = s.categories
+    .filter(c => c.locked)
+    .reduce((total, c) => total + derive.budget(c, month), 0);
+  const available = income - savings - lockedTotal;
+
+  const flexCats = s.categories.filter(c => !c.locked);
+  const baseEss  = sumValues(FLEX_DEFAULTS.essentials);     // 1030
+  const baseDisc = sumValues(FLEX_DEFAULTS.discretionary);  // 375
+  const defFor   = c => FLEX_DEFAULTS[c.group]?.[c.id] ?? (+c.budget || 0);
+
+  if (available >= baseEss + baseDisc) {
+    // Comfortable — everyone gets their default; surplus split 30/70 groceries/disc.
+    for (const c of flexCats) {
+      const d = FLEX_DEFAULTS[c.group]?.[c.id];
+      if (d != null) set(c.id, d);
+    }
+    const extra = available - baseEss - baseDisc;
+    if (extra > 0) {
+      set('groceries', 600 + Math.round(extra * 0.3));
+      const disc = flexCats.filter(c => c.group === 'discretionary');
+      const discTotal = disc.reduce((t, c) => t + defFor(c), 0);
+      for (const c of disc) set(c.id, defFor(c) + Math.round(extra * 0.7 * defFor(c) / discTotal));
+    }
+  } else if (available >= baseEss) {
+    // Essentials safe — scale discretionary down proportionally.
+    for (const c of flexCats) {
+      if (c.group === 'essentials' && FLEX_DEFAULTS.essentials[c.id] != null)
+        set(c.id, FLEX_DEFAULTS.essentials[c.id]);
+    }
+    const ratio = (available - baseEss) / baseDisc;
+    for (const c of flexCats) {
+      if (c.group === 'discretionary') set(c.id, Math.max(0, Math.round(defFor(c) * ratio)));
+    }
+  } else {
+    // Tight — protect groceries/fuel/kids/health; pro-rate or zero the rest.
+    set('groceries', Math.min(600, Math.round(available * 0.5)));
+    set('fuel',      Math.min(70,  Math.round(available * 0.07)));
+    set('kids',      Math.min(60,  Math.round(available * 0.05)));
+    set('health',    Math.min(100, Math.round(available * 0.08)));
+    const used = ['groceries','fuel','kids','health']
+      .reduce((t, id) => t + derive.budgetById(id, month), 0);
+    const leftover = available - used;
+    const weights = { drogist:50, familyp2p:150, restaurants:80, shopping:60, clothing:30, hair:40, atm:40, travel:60, snacks:25, kinderplezier:40 };
+    const flex = Object.keys(weights);
+    if (leftover > 0) {
+      const wsum = sumValues(weights);
+      for (const id of flex) set(id, Math.max(0, Math.round(leftover * weights[id] / wsum)));
+    } else {
+      for (const id of flex) set(id, 0);
+    }
+  }
+}
+
+/* -- Edit sheet (per-category) -------------------------------------------- */
+
+function openEdit(id) {
+  const cat = state.categories.find(c => c.id === id);
+  if (!cat) return;
+  view.editId = id;
+  $('editAmount').value = derive.budget(cat);
+  $('editNote').value   = cat.note || '';
+  $('editLock').classList.toggle('on', !!cat.locked);
+  $('entryNote').value   = '';
+  $('entryAmount').value = '';
+  renderEditSheet();
+  openModal('editModal');
+  setTimeout(() => $('entryAmount').focus(), 80);
+}
+
+function closeEdit() {
+  closeModal('editModal');
+  view.editId = null;
+}
+
+function saveEdit() {
+  const cat = editingCategory(); if (!cat) return;
+  const budget = +$('editAmount').value || 0;
+  const note   = $('editNote').value;
+  const locked = $('editLock').classList.contains('on');
+  commit(s => {
+    setOverride(s, cat.id, view.month, budget);
+    const c = s.categories.find(x => x.id === cat.id);
+    c.note   = note;
+    c.locked = locked;
+  });
+  closeEdit();
+  snack('Saved');
+}
+
+function resetMonthBudget(e) {
+  e?.preventDefault();
+  const cat = editingCategory(); if (!cat) return;
+  commit(s => clearOverride(s, cat.id, view.month));
+  $('editAmount').value = +cat.budget || 0;
+  snack('Reset to default');
+}
+
+function addEntry() {
+  const cat = editingCategory(); if (!cat) return;
+  const amount = parseFloat($('entryAmount').value);
+  if (!amount || amount <= 0) { snack('Enter an amount'); return; }
+  const note = $('entryNote').value.trim() || cat.name;
+  commit(s => {
+    const list = ((s.entries[view.month] ||= {})[cat.id] ||= []);
+    list.push({ id: newId(), amount, note, date: today() });
+  });
+  $('entryNote').value   = '';
+  $('entryAmount').value = '';
+  snack(`${fmt(amount)} logged`);
+  setTimeout(() => $('entryAmount').focus(), 50);
+}
+
+function deleteEntry(entryId) {
+  const cat = editingCategory(); if (!cat) return;
+  commit(s => {
+    const list = s.entries[view.month]?.[cat.id]; if (!list) return;
+    s.entries[view.month][cat.id] = list.filter(e => e.id !== entryId);
+    if (!s.entries[view.month][cat.id].length) delete s.entries[view.month][cat.id];
+  });
+  snack('Entry removed');
+}
+
+function deleteCategory() {
+  const cat = editingCategory(); if (!cat) return;
+  const count = derive.entries(cat.id).length;
+  if (!confirm(`Delete "${cat.name}"? All ${count} entries this month will go with it.`)) return;
+  commit(s => {
+    s.categories = s.categories.filter(c => c.id !== cat.id);
+    for (const m in s.entries) delete s.entries[m][cat.id];
+  });
+  closeEdit();
+  snack('Removed');
+}
+
+/* -- Quick log (FAB) ------------------------------------------------------ */
+
+function openQuickLog() {
+  // Frequently logged first, then everything non-fixed; dedup by id.
+  const priority = ['groceries','restaurants','shopping','fuel','drogist','health','clothing','familyp2p','kids','hair','atm','travel'];
+  const seen = new Set();
+  const ordered = [
+    ...priority.map(id => state.categories.find(c => c.id === id)).filter(Boolean),
+    ...state.categories.filter(c => c.group !== 'fixed'),
+  ].filter(c => !seen.has(c.id) && seen.add(c.id));
+  $('pickerGrid').innerHTML = ordered.map(c => `
+    <div class="picker-cell" onclick="pickCategory('${c.id}')">
+      <div class="pc-icon">${c.icon || '•'}</div>
+      <div class="pc-name">${escapeHtml(c.name)}</div>
+    </div>`).join('');
+  openModal('quickLog');
+}
+function closeQuickLog() { closeModal('quickLog'); }
+function pickCategory(id) { closeQuickLog(); openEdit(id); }
+
+/* -- Add a new category --------------------------------------------------- */
+
+function openAdd() {
+  $('addName').value   = '';
+  $('addAmount').value = '';
+  $('addGroup').value  = 'discretionary';
+  $('addLock').classList.remove('on');
+  openModal('addModal');
+}
+function closeAdd() { closeModal('addModal'); }
+function saveAdd() {
+  const name = $('addName').value.trim();
+  if (!name) { snack('Name required'); return; }
+  const cat = {
+    id:     name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '_' + Date.now().toString(36),
+    name,
+    group:  $('addGroup').value,
+    note:   '',
+    budget: +$('addAmount').value || 0,
+    locked: $('addLock').classList.contains('on'),
+    icon:   '•',
+    color:  'grey',
+  };
+  commit(s => s.categories.push(cat));
+  closeAdd();
+  snack('Added');
+}
+
+/* -- Settings ------------------------------------------------------------- */
+
+function saveConfig() {
+  const income   = +$('cfgIncome').value   || 0;
+  const savings  = +$('cfgSavings').value  || 0;
+  const currency = $('cfgCurrency').value.trim() || '€';
+  commit(s => { s.config.income = income; s.config.savings = savings; s.config.currency = currency; });
+  snack('Settings saved');
+}
+
+/* -- Month navigation (the top picker) ----------------------------------- */
+
+function stepMonth(delta) {
+  const next = shiftMonth(view.month, delta);
+  const { min, max } = derive.monthBounds();
+  if (next < min || next > max) return;
+  view.month = next;
+  render();
+  snack(monthName(view.month));
+}
+function pickMonth(month) {
+  view.month = month;
+  closeMonthPicker();
+  render();
+  snack(monthName(month));
+}
+function closeMonthPicker() { closeModal('monthPicker'); }
+
+function openMonthPicker() {
+  // Include the rolling window plus any month with logged spend (even outside the window).
+  const months = new Set();
+  for (let i = -MONTH_RANGE.back; i <= MONTH_RANGE.ahead; i++) months.add(shiftMonth(thisMonth(), i));
+  for (const m in state.entries) if (Object.keys(state.entries[m] || {}).length) months.add(m);
+  const now = thisMonth();
+  $('monthList').innerHTML = [...months].sort().reverse().map(m => {
+    const t = derive.totals(m);
+    const meta = t.spent > 0 ? `${fmt(t.spent)} spent` : (m > now ? 'Upcoming' : 'No activity');
+    return `<button type="button" class="month-cell ${m === view.month ? 'active' : ''} ${m === now ? 'is-today' : ''}" onclick="pickMonth('${m}')">
+      <span class="mc-name">${escapeHtml(monthName(m))}</span>
+      <span class="mc-meta">${escapeHtml(meta)}</span>
+    </button>`;
+  }).join('');
+  openModal('monthPicker');
+  // Centre the active month after the sheet animates in
+  setTimeout(() => $('monthList').querySelector('.month-cell.active')?.scrollIntoView({ block: 'center' }), 20);
+}
+
+/* -- Dinner planner ------------------------------------------------------- */
+
+function stepWeek(delta) {
+  const d = new Date(view.week); d.setDate(d.getDate() + delta * 7);
+  view.week = d;
+  renderFoodView();
+}
+function goToCurrentWeek() {
+  view.week = mondayOf(new Date());
+  renderFoodView();
+  snack('This week');
+}
+/** Save dinner text WITHOUT re-rendering — the textarea is the live view of the data. */
+function saveDinner(textarea) {
+  autoGrow(textarea);
+  const key = textarea.dataset.date;
+  const value = textarea.value;
+  commit(s => {
+    const day = s.meals[key] || {};
+    day.dinner = value;
+    const empty = !value.trim() && !day.breakfast && !day.lunch && !day.notes;
+    if (empty) delete s.meals[key];
+    else      s.meals[key] = day;
+  }, { render: false });
+}
+
+/* -- Shopping list -------------------------------------------------------- */
+
+function setShopWeek(week) {
+  view.shopWeek = String(week);
+  renderShopTabs();
+  renderShoppingList();
+}
+
+/** Get-or-create the weekly bucket inside a mutator. */
+function shopBucketIn(s, week, month = view.month) {
+  const wk = (s.shopping[month] ||= { '1':[], '2':[], '3':[], '4':[] });
+  return (wk[week] ||= []);
+}
+
+function addShopItem() {
+  const name = $('shopItem').value.trim();
+  if (!name) return;
+  commit(s => shopBucketIn(s, view.shopWeek).push({ id: newId(), item: name, done: false }));
+  $('shopItem').value = '';
+  $('shopItem').focus();
+}
+function toggleShop(id) {
+  commit(s => {
+    const it = shopBucketIn(s, view.shopWeek).find(i => i.id === id);
+    if (it) it.done = !it.done;
+  });
+}
+function removeShop(id) {
+  commit(s => {
+    s.shopping[view.month][view.shopWeek] = shopBucketIn(s, view.shopWeek).filter(i => i.id !== id);
+  });
+}
+
+/* -- Shopping context menu (right-click / long-press) -------------------- */
+
+function openShopMenu(e, itemId) {
+  e.preventDefault();
+  view.ctxId = itemId;
+  const others = ['1','2','3','4'].filter(w => w !== view.shopWeek);
+  const row = (action, w) => {
+    const r = derive.shopWeekRange(w);
+    const icon = action === 'copy' ? '⧉' : '→';
+    return `<button type="button" class="ctx-item" onclick="moveShopItem('${action}','${w}')">${icon}&nbsp; Week ${w} <span style="color:var(--text-dim);font-weight:500">· ${r.start}–${r.end}</span></button>`;
+  };
+  const menu = $('ctxMenu');
+  menu.innerHTML =
+    `<div class="ctx-head">Duplicate to</div>${others.map(w => row('copy', w)).join('')}` +
+    `<div class="ctx-sep"></div>` +
+    `<div class="ctx-head">Move to</div>${others.map(w => row('move', w)).join('')}`;
+  menu.classList.add('open');
+  // Clamp the menu inside the viewport
+  const x = Math.max(8, Math.min(e.clientX, innerWidth  - menu.offsetWidth  - 8));
+  const y = Math.max(8, Math.min(e.clientY, innerHeight - menu.offsetHeight - 8));
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+}
+function closeShopMenu() {
+  $('ctxMenu').classList.remove('open');
+  view.ctxId = null;
+}
+function moveShopItem(action, week) {
+  const itemId = view.ctxId;
+  commit(s => {
+    const from = shopBucketIn(s, view.shopWeek);
+    const item = from.find(i => i.id === itemId);
+    if (!item) return;
+    if (action === 'copy') {
+      shopBucketIn(s, week).push({ id: newId(), item: item.item, done: false });
+    } else {
+      shopBucketIn(s, week).push({ id: item.id, item: item.item, done: item.done });
+      s.shopping[view.month][view.shopWeek] = from.filter(i => i.id !== itemId);
+    }
+  });
+  closeShopMenu();
+  snack(`${action === 'copy' ? 'Duplicated' : 'Moved'} to Week ${week}`);
+}
+
+/* -- Resets -------------------------------------------------------------- */
+
+function resetPlan() {
+  if (!confirm('Reset all budget amounts to defaults? Meal plans and shopping list will be kept.')) return;
+  commit(s => { s.categories = structuredClone(DEFAULTS.categories); });
+  snack('Plan reset');
+}
+function hardReset() {
+  if (!confirm('Wipe ALL data (plan, meals, shopping list, settings)?')) return;
+  localStorage.removeItem(STORE_KEY);
+  state = structuredClone(DEFAULTS);
+  view.month    = thisMonth();
+  view.week     = mondayOf(new Date());
+  view.shopWeek = '1';
+  view.editId   = null;
+  view.ctxId    = null;
+  render();
+  openOnboard(false);
+  snack('All data cleared');
+}
+
+/* ── 10. Snackbar ──────────────────────────────────────────────────────── */
+/* A toast lives in the DOM only while it is visible; the newest message
+   replaces any in-flight one. */
+let snackHideTimer = null;
+let snackRemoveTimer = null;
+function snack(message) {
+  clearTimeout(snackHideTimer);
+  clearTimeout(snackRemoveTimer);
+  for (const el of document.querySelectorAll('.snack')) el.remove();
+
+  const el = document.createElement('div');
+  el.className = 'snack';
+  el.textContent = message;
+  document.body.appendChild(el);
+  // Force a reflow so the slide-in transition plays from the off-screen state
+  void el.offsetHeight;
+  el.classList.add('show');
+
+  snackHideTimer = setTimeout(() => {
+    el.classList.remove('show');
+    snackRemoveTimer = setTimeout(() => el.remove(), SNACK.transitionMs);
+  }, SNACK.visibleMs);
+}
+
+/* ── 11. Global wiring & init ──────────────────────────────────────────── */
+
+// Enter submits the shopping and transaction inputs.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const id = document.activeElement?.id;
+  if (id === 'shopItem')                              addShopItem();
+  if (id === 'entryNote' || id === 'entryAmount')     addEntry();
+});
+
+// Long-press on a shopping item opens its context menu on touch devices.
+let longPressTimer = null;
+document.addEventListener('touchstart', e => {
+  const row = e.target.closest?.('.shop-item[oncontextmenu]');
+  if (!row) return;
+  const id = (row.getAttribute('oncontextmenu').match(/'([^']+)'\)/) || [])[1];
+  const t = e.touches[0];
+  longPressTimer = setTimeout(
+    () => openShopMenu({ preventDefault() {}, clientX: t.clientX, clientY: t.clientY }, id),
+    480);
+}, { passive: true });
+for (const ev of ['touchend','touchmove','touchcancel'])
+  document.addEventListener(ev, () => clearTimeout(longPressTimer), { passive: true });
+
+// Dismiss the context menu on any outside click or scroll.
+document.addEventListener('click', e => {
+  if ($('ctxMenu').classList.contains('open') && !e.target.closest('#ctxMenu')) closeShopMenu();
+});
+window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, true);
+
+// Boot.
+runMigrations();
+if (isFirstRun) openOnboard(false);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Editor / IDE cruft
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Claude Code local overrides (per-machine; not for sharing)
+.claude/settings.local.json
+
+# Python preview server cruft
+__pycache__/
+*.pyc
