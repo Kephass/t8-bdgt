@@ -651,7 +651,13 @@ function addEntry() {
   const amount = parseAmount($('entryAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
   const note = $('entryNote').value.trim() || cat.name;
-  const entry = { id: newId(), amount, note, date: today() };
+  // Date must fall inside view.month — otherwise cloud's month_key (derived
+  // from the date) ends up in the wrong bucket and on reload hydrate()
+  // collapses the entry into the current month. Use today when we're
+  // already viewing the current month, the 15th of the viewed month
+  // otherwise (always a valid day, sits comfortably mid-month).
+  const date = view.month === thisMonth() ? today() : `${view.month}-15`;
+  const entry = { id: newId(), amount, note, date };
   commit(s => {
     const list = ((s.entries[view.month] ||= {})[cat.id] ||= []);
     list.push(entry);
