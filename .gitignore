@@ -13,3 +13,6 @@
 # Python preview server cruft
 __pycache__/
 *.pyc
+
+# Local Supabase config — never commit credentials
+config.js
