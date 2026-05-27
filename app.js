@@ -907,6 +907,27 @@ function moveShopItem(action, week) {
   snack(`${action === 'copy' ? 'Duplicated' : 'Moved'} to Week ${week}`);
 }
 
+/* -- Manual refresh from the cloud --------------------------------------- */
+
+/** Pull the household's data fresh from Supabase and re-render.
+   Triggered by tapping the refresh icon or by pull-to-refresh on touch. */
+async function refresh() {
+  if (cloud.pending > 0) return;       // already in flight
+  if (!cloud.householdId) return;      // not signed in / no household yet
+  const ptr = $('ptr');
+  const btn = $('refreshBtn');
+  ptr.classList.add('refreshing');
+  ptr.classList.remove('ready', 'visible');
+  btn?.classList.add('refreshing');
+  try {
+    await hydrate();
+  } finally {
+    ptr.classList.remove('refreshing');
+    ptr.style.transform = '';
+    btn?.classList.remove('refreshing');
+  }
+}
+
 /* -- Resets -------------------------------------------------------------- */
 
 function resetPlan() {
@@ -1013,6 +1034,9 @@ const ACTIONS = {
 
   // Budget view reset
   resetPlan,
+
+  // Manual cloud refresh (tap the sync pill, or pull-to-refresh)
+  refresh,
 };
 
 const CONTEXT_ACTIONS = {
@@ -1063,6 +1087,48 @@ document.addEventListener('click', e => {
   if ($('ctxMenu').classList.contains('open') && !e.target.closest('#ctxMenu')) closeShopMenu();
 });
 window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, true);
+
+/* ── Pull-to-refresh ─────────────────────────────────────────────────────
+   Only kicks in at the very top of the page, outside any modal, while
+   signed in and not already syncing. Past the threshold the indicator
+   turns green; release to fire refresh(). Below threshold it snaps back. */
+const PTR_THRESHOLD = 70;
+let ptrStartY = null;
+let ptrDistance = 0;
+function ptrEligible() {
+  return window.scrollY <= 0
+      && !document.querySelector('.modal.open')
+      && cloud.householdId
+      && cloud.pending === 0;
+}
+document.addEventListener('touchstart', e => {
+  if (!ptrEligible()) return;
+  ptrStartY   = e.touches[0].clientY;
+  ptrDistance = 0;
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (ptrStartY == null) return;
+  const deltaY = e.touches[0].clientY - ptrStartY;
+  if (deltaY <= 0) return;
+  ptrDistance = Math.min(deltaY * 0.5, 100);  // 0.5 = rubber-band damping
+  const ptr = $('ptr');
+  ptr.classList.add('visible');
+  ptr.style.transform = `translate(-50%, ${ptrDistance - 36}px)`;
+  ptr.classList.toggle('ready', ptrDistance >= PTR_THRESHOLD);
+}, { passive: true });
+document.addEventListener('touchend', () => {
+  if (ptrStartY == null) return;
+  const triggered = ptrDistance >= PTR_THRESHOLD;
+  ptrStartY = null;
+  ptrDistance = 0;
+  const ptr = $('ptr');
+  if (triggered) {
+    refresh();   // refresh() handles its own visual state
+  } else {
+    ptr.classList.remove('visible', 'ready');
+    ptr.style.transform = '';
+  }
+}, { passive: true });
 
 /* ── 12. Auth UI handlers: see auth-ui.js ──────────────────────────────── */
 
