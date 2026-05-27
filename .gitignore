@@ -14,5 +14,7 @@
 __pycache__/
 *.pyc
 
-# Local Supabase config — never commit credentials
-config.js
+# NOTE: config.js IS committed. It holds only the Supabase URL + publishable
+# key — both designed to ship in client code. RLS in the database protects
+# data, not the key itself. If you ever swap in an `sb_secret_…` key,
+# gitignore that file instead.
