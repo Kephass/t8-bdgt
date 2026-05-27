@@ -281,3 +281,9 @@
   .picker-cell:active{background:var(--card-hi);transform:scale(.97)}
   .picker-cell .pc-icon{font-size:24px;margin-bottom:4px}
   .picker-cell .pc-name{font-size:11px;font-weight:600;line-height:1.2;color:var(--text-mid)}
+
+  /* Sync status pill in header */
+  .sync-pill{font-size:10px;font-weight:700;padding:4px 9px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+  .sync-pill[data-kind="ok"]{background:rgba(62,224,143,.15);color:var(--green)}
+  .sync-pill[data-kind="busy"]{background:rgba(243,202,90,.15);color:var(--amber)}
+  .sync-pill[data-kind="err"]{background:rgba(238,90,90,.15);color:var(--red)}

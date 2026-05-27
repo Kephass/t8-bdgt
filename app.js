@@ -15,59 +15,24 @@
    • render*  — pure projections of state → DOM
    • actions  — user-triggered commands; each ends in a commit() or modal op
 
+   Companion files (loaded before this one — see index.html):
+     • defaults.js   — window.DEFAULTS (seed config + categories)
+     • migrations.js — runMigrations / migrateActuals / migrateShopping / seedRescueMonth
+     • auth-ui.js    — auth-modal handlers + onAuthed() household wiring
+     • cloud.js      — Supabase client, auth/sync API, hydrate()
+
    Modules below are ordered so every name is defined before it is used.
    ========================================================================== */
 
-/* ── 1. Constants & defaults ─────────────────────────────────────────────── */
+/* ── 1. Constants ────────────────────────────────────────────────────────── */
 
-const STORE_KEY   = 'familyBudget.v1';
+const STORE_KEY   = 'familyBudget.v2';
+const LEGACY_KEYS = ['familyBudget.v1'];   // wiped on first boot of v2
 const MONTH_RANGE = { back: 24, ahead: 6 };          // months reachable from the picker
 const SNACK       = { visibleMs: 3500, transitionMs: 320 };  // keep transitionMs == .snack CSS
 const SHOP_WEEK_START = { 1: 1, 2: 8, 3: 15, 4: 22 };  // week 4 runs to month-end
 
-const DEFAULTS = {
-  config: { income: 3209, savings: 100, currency: '€', cofidis: true },
-  // Real audited Belgian household figures, grouped by spend priority.
-  categories: [
-    // Fixed (locked, non-negotiable bills)
-    { id:'rent',          group:'fixed',         name:'Rent',                        note:'BE10 3300 3681 6204 — 1st of month',     budget:968, locked:true,  icon:'🏠', color:'red'   },
-    { id:'eneco',         group:'fixed',         name:'Energy (Eneco)',              note:'Monthly bill',                            budget:185, locked:true,  icon:'⚡', color:'amber' },
-    { id:'pidpa',         group:'fixed',         name:'Water (Pidpa)',               note:'Quarterly, smoothed',                     budget:75,  locked:true,  icon:'💧', color:'blue'  },
-    { id:'kbcwoning',     group:'fixed',         name:'KBC woningpolis',             note:'Renters insurance',                       budget:20,  locked:true,  icon:'🛡️', color:'blue'  },
-    { id:'kbcauto',       group:'fixed',         name:'KBC autoverzekering',         note:'Audi (Tesla via Patney BV)',              budget:46,  locked:true,  icon:'🚗', color:'blue'  },
-    { id:'kbcgezin',      group:'fixed',         name:'KBC gezinspolis',             note:'Quarterly, smoothed',                     budget:10,  locked:true,  icon:'👨‍👩‍👧', color:'blue'  },
-    { id:'mutu',          group:'fixed',         name:'Christelijke Mutualiteit',    note:'Health insurance, 2 members',             budget:20,  locked:true,  icon:'➕', color:'green' },
-    { id:'school',        group:'fixed',         name:'School / childcare',          note:'Tremelo school + Ferm + Kinderplaneet',   budget:125, locked:true,  icon:'🎒', color:'purple'},
-    { id:'gemeente',      group:'fixed',         name:'Local taxes (Tremelo)',       note:'Smoothed monthly',                        budget:48,  locked:true,  icon:'🏛️', color:'grey'  },
-    { id:'cofidis',       group:'fixed',         name:'Cofidis loan',                note:'Ends Jun 2026',                           budget:160, locked:true,  icon:'💳', color:'red'   },
-    { id:'bankunion',     group:'fixed',         name:'Bank fees / ACV-CSC',         note:'Union dues + small bank fees',            budget:14,  locked:true,  icon:'⚙️', color:'grey'  },
-    { id:'basicfit',      group:'fixed',         name:'Gym (Basic-Fit)',             note:'Cannot cancel — keep paying',             budget:23,  locked:true,  icon:'💪', color:'amber' },
-    { id:'taptap',        group:'fixed',         name:'TapTap Send (family abroad)', note:'Fixed family obligation',                 budget:110, locked:true,  icon:'🌍', color:'purple'},
-    { id:'rodekruis',     group:'fixed',         name:'Donations (Rode Kruis)',      note:'€9/mo SEPA — cannot pause',               budget:9,   locked:true,  icon:'❤️', color:'red'   },
-    { id:'funeral',       group:'fixed',         name:'Funeral funds',               note:'Family obligation — fixed',               budget:100, locked:true,  icon:'🕯️', color:'grey'  },
-    // Essentials
-    { id:'groceries',     group:'essentials',    name:'Groceries',                   note:'Family of 5 — Colruyt/Aldi',              budget:600, locked:false, icon:'🛒', color:'green' },
-    { id:'health',        group:'essentials',    name:'Health / pharmacy',           note:'Apotheek, dental, mutualiteit gap',       budget:100, locked:false, icon:'💊', color:'green' },
-    { id:'fuel',          group:'essentials',    name:'Fuel (Audi)',                 note:'Tesla via Patney BV',                     budget:70,  locked:false, icon:'⛽', color:'amber' },
-    { id:'drogist',       group:'essentials',    name:'Drogist / household',         note:'Kruidvat, Action, cleaning',              budget:50,  locked:false, icon:'🧴', color:'blue'  },
-    { id:'kids',          group:'essentials',    name:'Kids clothing (3 kids)',      note:'Recurring',                               budget:60,  locked:false, icon:'👕', color:'purple'},
-    { id:'familyp2p',     group:'essentials',    name:'Family P2P / Payconiq',       note:'Gifts, school, transfers',                budget:150, locked:false, icon:'💌', color:'purple'},
-    // Discretionary
-    { id:'restaurants',   group:'discretionary', name:'Restaurants & dining',        note:'1 family meal / 2 weeks max',             budget:80,  locked:false, icon:'🍽️', color:'amber' },
-    { id:'shopping',      group:'discretionary', name:'Online shopping',             note:'Amazon, Bol — consolidated',              budget:60,  locked:false, icon:'📦', color:'blue'  },
-    { id:'clothing',      group:'discretionary', name:'Adult clothing',              note:'One small purchase / month',              budget:30,  locked:false, icon:'👔', color:'blue'  },
-    { id:'hair',          group:'discretionary', name:'Hair (Blessco)',              note:'Every 5–6 weeks',                         budget:40,  locked:false, icon:'💇', color:'purple'},
-    { id:'atm',           group:'discretionary', name:'ATM cash',                    note:'~€30/wk max',                             budget:40,  locked:false, icon:'💶', color:'green' },
-    { id:'travel',        group:'discretionary', name:'Travel fund',                 note:'Annual trip pot',                         budget:60,  locked:false, icon:'✈️', color:'blue'  },
-    { id:'snacks',        group:'discretionary', name:'Snacks',                      note:'For wife & kids',                         budget:25,  locked:false, icon:'🍪', color:'amber' },
-    { id:'kinderplezier', group:'discretionary', name:'Kinderplezier',               note:'Books & treats for the kids',             budget:40,  locked:false, icon:'📚', color:'purple'},
-  ],
-  entries:         {},  // entries[YYYY-MM][catId] = [{ id, amount, note, date }]
-  meals:           {},  // meals[YYYY-MM-DD]       = { dinner, … }
-  shopping:        {},  // shopping[YYYY-MM][week] = [{ id, item, done }]
-  budgetOverrides: {},  // budgetOverrides[YYYY-MM][catId] = number
-  flags:           {},  // one-shot guards for migrations/seeds
-};
+// Per-household seed values live in defaults.js → window.DEFAULTS.
 
 /* ── 2. Tiny utilities ───────────────────────────────────────────────────── */
 
@@ -110,6 +75,10 @@ function mondayOf(date) {
 
 /* ── 4. Store: state, view, persistence, commit ──────────────────────────── */
 
+// One-time wipe of pre-cloud localStorage. The new app is cloud-of-truth;
+// any v1 leftovers would just confuse hydration.
+for (const k of LEGACY_KEYS) localStorage.removeItem(k);
+
 /** Was localStorage empty when we loaded? Captured before migrations write to it. */
 const isFirstRun = localStorage.getItem(STORE_KEY) === null;
 
@@ -126,20 +95,32 @@ const view = {
   ctxId:    null,
 };
 
+function blankState() {
+  return {
+    config:          { income: 0, savings: 0, currency: '€', cofidis: true },
+    categories:      [],
+    entries:         {},
+    meals:           {},
+    shopping:        {},
+    budgetOverrides: {},
+    flags:           {},
+  };
+}
+
 function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (saved) return {
-      ...structuredClone(DEFAULTS), ...saved,
-      config:          { ...DEFAULTS.config, ...(saved.config || {}) },
-      categories:      saved.categories?.length ? saved.categories : structuredClone(DEFAULTS.categories),
+      ...blankState(), ...saved,
+      config:          { ...blankState().config, ...(saved.config || {}) },
+      categories:      saved.categories      || [],
       meals:           saved.meals           || {},
       shopping:        saved.shopping        || {},
       budgetOverrides: saved.budgetOverrides || {},
       flags:           saved.flags           || {},
     };
-  } catch { /* corrupt → fall through to defaults */ }
-  return structuredClone(DEFAULTS);
+  } catch { /* corrupt → fall through to blank */ }
+  return blankState();
 }
 
 function save() {
@@ -157,106 +138,7 @@ function commit(mutate, { render: doRender = true } = {}) {
   if (doRender) render();
 }
 
-/* ── 5. Migrations: upgrade older persisted shapes ───────────────────────── */
-
-function runMigrations() {
-  migrateActuals();
-  migrateShopping();
-  seedRescueMonth();
-}
-
-/** Legacy { actuals[month][catId] = amount } → explicit entries. */
-function migrateActuals() {
-  if (!state.actuals || !Object.keys(state.actuals).length) return;
-  for (const m in state.actuals) {
-    state.entries[m] ||= {};
-    for (const catId in state.actuals[m]) {
-      const amount = +state.actuals[m][catId] || 0;
-      if (amount <= 0) continue;
-      (state.entries[m][catId] ||= []).push({
-        id: newId(), amount, note: 'Migrated total', date: m + '-15',
-      });
-    }
-  }
-  delete state.actuals;
-  save();
-}
-
-/** Shopping: flat array OR un-scoped weeks → month-scoped 4-week buckets. */
-function migrateShopping() {
-  const blank = () => ({ '1': [], '2': [], '3': [], '4': [] });
-  const clean = it => ({ id: it.id, item: it.item, done: !!it.done });
-  const s = state.shopping;
-
-  if (Array.isArray(s)) {
-    const weeks = blank();
-    weeks['1'] = s.map(clean);
-    state.shopping = { [thisMonth()]: weeks };
-    save();
-    return;
-  }
-  if (!s || typeof s !== 'object') { state.shopping = {}; return; }
-
-  const keys = Object.keys(s);
-  const isUnscoped = keys.length > 0 && keys.every(k => ['1','2','3','4'].includes(k));
-  if (isUnscoped) {
-    const weeks = blank();
-    for (const w of ['1','2','3','4']) weeks[w] = (s[w] || []).map(clean);
-    state.shopping = { [thisMonth()]: weeks };
-    save();
-    return;
-  }
-  // Already month-scoped — normalize items and ensure all 4 weeks exist
-  for (const m in s) {
-    const month = s[m] || {};
-    for (const w of ['1','2','3','4']) month[w] = (month[w] || []).map(clean);
-    s[m] = month;
-  }
-}
-
-/** One-shot seed: the May 2026 cashflow-rescue plan from the Numbers sheet. */
-function seedRescueMonth() {
-  if (state.flags.may2026rescue) return;
-
-  const ensure = cat => {
-    if (!state.categories.find(c => c.id === cat.id)) state.categories.push(cat);
-  };
-  ensure({ id:'funeral',       group:'fixed',         name:'Funeral funds', note:'Family obligation — fixed',   budget:100, locked:true,  icon:'🕯️', color:'grey'   });
-  ensure({ id:'snacks',        group:'discretionary', name:'Snacks',        note:'For wife & kids',             budget:25,  locked:false, icon:'🍪', color:'amber'  });
-  ensure({ id:'kinderplezier', group:'discretionary', name:'Kinderplezier', note:'Books & treats for the kids', budget:40,  locked:false, icon:'📚', color:'purple' });
-
-  const seed = [ /* [catId, amount, note, day] */
-    ['rent',          968.05, 'Rent — 1 May',                                  1],
-    ['eneco',         184.46, 'Eneco — April catch-up (deferred bill)',        5],
-    ['pidpa',         226.00, 'Pidpa water — single-month payment',            8],
-    ['kbcwoning',      19.82, 'KBC woningpolis (May premium)',                 5],
-    ['school',         47.88, 'Childcare — OCMW',                              5],
-    ['school',         29.00, 'School kids — Klimboom',                       10],
-    ['cofidis',       160.13, 'Cofidis loan — one of last instalments',        5],
-    ['bankunion',      13.83, 'Bank fees + ACV-CSC',                           5],
-    ['groceries',     571.60, 'Groceries (compressed, discount-store run)',   15],
-    ['health',         28.05, 'Pharmacy — necessities only',                  10],
-    ['fuel',           70.04, 'Fuel — Audi',                                   8],
-    ['drogist',        39.18, 'Drogist / household — bare necessities',       12],
-    ['kids',           20.00, "Kids' clothes",                                15],
-    ['familyp2p',      10.00, 'Family P2P — essentials only',                 12],
-    ['funeral',       100.00, 'Funeral funds',                                 5],
-    ['snacks',          1.79, 'Snacks for the kids',                          14],
-    ['basicfit',       23.00, 'Gym (Basic-Fit) — cannot cancel',               1],
-    ['atm',            40.00, 'ATM cash — tight cap',                         10],
-    ['taptap',        110.00, 'TapTap Send — family abroad',                   5],
-    ['rodekruis',       9.00, 'Rode Kruis SEPA',                               5],
-    ['kinderplezier',  33.90, 'Books for the kids',                           18],
-  ];
-  state.entries['2026-05'] ||= {};
-  for (const [catId, amount, note, day] of seed) {
-    (state.entries['2026-05'][catId] ||= []).push({
-      id: newId(), amount, note, date: `2026-05-${pad2(day)}`,
-    });
-  }
-  state.flags.may2026rescue = true;
-  save();
-}
+/* ── 5. Migrations + seeds: see migrations.js ────────────────────────────── */
 
 /* ── 6. Derive: pure selectors over state ────────────────────────────────── */
 
@@ -418,7 +300,7 @@ function categoryRows(cats) {
           <span class="pl-remaining ${cls}">${remaining >= 0 ? fmt(remaining) + ' left' : fmt(-remaining) + ' over'}</span>
         </div>` : '';
 
-    return `<div class="row" onclick="openEdit('${cat.id}')">
+    return `<div class="row" data-action="openEdit" data-id="${cat.id}">
       <div class="icon ${cat.color || 'grey'}">${cat.icon || '•'}</div>
       <div class="meta">
         <div class="name">${escapeHtml(cat.name)}</div>
@@ -475,7 +357,7 @@ function renderDinnerWeek() {
         <div class="dr-dow">${d.toLocaleString('en-US', { weekday: 'short' })}</div>
         <div class="dr-dom">${d.getDate()}</div>
       </div>
-      <textarea class="dr-input" data-date="${key}" oninput="saveDinner(this)" placeholder="What's for dinner?" rows="1">${escapeHtml(dinner)}</textarea>
+      <textarea class="dr-input" data-date="${key}" data-on-input="saveDinner" placeholder="What's for dinner?" rows="1">${escapeHtml(dinner)}</textarea>
     </div>`;
   }).join('');
   $('dinnerWeekCard').innerHTML = rows;
@@ -509,10 +391,10 @@ function renderShoppingList() {
     return;
   }
   $('shoppingList').innerHTML = list.map(it => `
-    <div class="shop-item ${it.done ? 'done' : ''}" onclick="toggleShop('${it.id}')" oncontextmenu="openShopMenu(event,'${it.id}')">
+    <div class="shop-item ${it.done ? 'done' : ''}" data-action="toggleShop" data-context-action="openShopMenu" data-id="${it.id}">
       <div class="check"></div>
       <div class="text">${escapeHtml(it.item)}</div>
-      <div onclick="event.stopPropagation();removeShop('${it.id}')" style="color:var(--text-dim);padding:0 4px;font-size:18px;cursor:pointer">×</div>
+      <div data-action="removeShop" data-id="${it.id}" style="color:var(--text-dim);padding:0 4px;font-size:18px;cursor:pointer">×</div>
     </div>`).join('');
 }
 
@@ -549,7 +431,7 @@ function renderEditEntries(cat) {
         <div class="e-note">${escapeHtml(e.note || '(no note)')}</div>
         <div class="e-date">${date}</div>
         <div class="e-amt num">${fmt(+e.amount)}</div>
-        <div class="e-del" onclick="event.stopPropagation();deleteEntry('${e.id}')">×</div>
+        <div class="e-del" data-action="deleteEntry" data-id="${e.id}">×</div>
       </div>`;
       }).join('')
     : '<div class="entries-empty">No entries yet — add the first transaction above.</div>';
@@ -560,7 +442,7 @@ function renderEditBudgetScope(cat) {
   if (derive.hasOverride(cat.id)) {
     $('editBudgetScope').innerHTML = `· <span style="color:var(--amber)">Custom for ${escapeHtml(monthLbl)}</span>`;
     $('editBudgetHelp').innerHTML  =
-      `Default is ${fmt(+cat.budget || 0)}. <a href="#" onclick="resetMonthBudget(event)" style="color:var(--green);text-decoration:underline">Reset to default</a>`;
+      `Default is ${fmt(+cat.budget || 0)}. <a href="#" data-action="resetMonthBudget" style="color:var(--green);text-decoration:underline">Reset to default</a>`;
   } else {
     $('editBudgetScope').innerHTML = `· <span style="color:var(--text-dim)">${escapeHtml(monthLbl)} only</span>`;
     $('editBudgetHelp').textContent = `Edits apply to ${monthLbl} only. Other months keep their own budget.`;
@@ -572,9 +454,10 @@ function editingCategory() {
 }
 
 /* ── 9. Actions — the only callers of commit() ──────────────────────────── */
-/* Every function in this section is reachable from an HTML inline handler;
-   they all stay as top-level `function` declarations so the browser exposes
-   them as globals automatically. */
+/* Each function here corresponds to a user-triggered command. They are wired
+   up declaratively in the markup via `data-action="<name>"` and dispatched
+   through the ACTIONS registry in section 11 — so the functions themselves
+   take normal arguments, not DOM events. */
 
 const openModal  = id => $(id).classList.add('open');
 const closeModal = id => $(id).classList.remove('open');
@@ -616,6 +499,15 @@ function applyOnboard() {
     s.config.cofidis  = cofidis;
     rebalanceMonth(s, view.month, income, savings);
   });
+  sync.updateConfig({ income, savings, cofidis });
+  // Push every override for this month so DB matches the rebalanced state.
+  for (const cat of state.categories) {
+    if (derive.hasOverride(cat.id)) {
+      sync.upsertOverride(view.month, cat.id, state.budgetOverrides[view.month][cat.id]);
+    } else {
+      sync.deleteOverride(view.month, cat.id);
+    }
+  }
   closeOnboard();
   snack(`${monthName(view.month)} rebalanced`);
 }
@@ -737,6 +629,10 @@ function saveEdit() {
     c.note   = note;
     c.locked = locked;
   });
+  const updated = state.categories.find(c => c.id === cat.id);
+  sync.upsertCategory(updated);
+  if (derive.hasOverride(cat.id)) sync.upsertOverride(view.month, cat.id, budget);
+  else                            sync.deleteOverride(view.month, cat.id);
   closeEdit();
   snack('Saved');
 }
@@ -745,6 +641,7 @@ function resetMonthBudget(e) {
   e?.preventDefault();
   const cat = editingCategory(); if (!cat) return;
   commit(s => clearOverride(s, cat.id, view.month));
+  sync.deleteOverride(view.month, cat.id);
   $('editAmount').value = +cat.budget || 0;
   snack('Reset to default');
 }
@@ -754,10 +651,12 @@ function addEntry() {
   const amount = parseAmount($('entryAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
   const note = $('entryNote').value.trim() || cat.name;
+  const entry = { id: newId(), amount, note, date: today() };
   commit(s => {
     const list = ((s.entries[view.month] ||= {})[cat.id] ||= []);
-    list.push({ id: newId(), amount, note, date: today() });
+    list.push(entry);
   });
+  sync.upsertEntry(cat.id, entry);
   $('entryNote').value   = '';
   $('entryAmount').value = '';
   snack(`${fmt(amount)} logged`);
@@ -771,6 +670,7 @@ function deleteEntry(entryId) {
     s.entries[view.month][cat.id] = list.filter(e => e.id !== entryId);
     if (!s.entries[view.month][cat.id].length) delete s.entries[view.month][cat.id];
   });
+  sync.deleteEntry(entryId);
   snack('Entry removed');
 }
 
@@ -782,6 +682,7 @@ function deleteCategory() {
     s.categories = s.categories.filter(c => c.id !== cat.id);
     for (const m in s.entries) delete s.entries[m][cat.id];
   });
+  sync.deleteCategory(cat.id);   // CASCADE in DB cleans entries + overrides
   closeEdit();
   snack('Removed');
 }
@@ -797,7 +698,7 @@ function openQuickLog() {
     ...state.categories.filter(c => c.group !== 'fixed'),
   ].filter(c => !seen.has(c.id) && seen.add(c.id));
   $('pickerGrid').innerHTML = ordered.map(c => `
-    <div class="picker-cell" onclick="pickCategory('${c.id}')">
+    <div class="picker-cell" data-action="pickCategory" data-id="${c.id}">
       <div class="pc-icon">${c.icon || '•'}</div>
       <div class="pc-name">${escapeHtml(c.name)}</div>
     </div>`).join('');
@@ -830,6 +731,7 @@ function saveAdd() {
     color:  'grey',
   };
   commit(s => s.categories.push(cat));
+  sync.upsertCategory(cat, state.categories.length - 1);
   closeAdd();
   snack('Added');
 }
@@ -841,6 +743,7 @@ function saveConfig() {
   const savings  = parseAmount($('cfgSavings').value);
   const currency = $('cfgCurrency').value.trim() || '€';
   commit(s => { s.config.income = income; s.config.savings = savings; s.config.currency = currency; });
+  sync.updateConfig({ income, savings, currency });
   snack('Settings saved');
 }
 
@@ -871,7 +774,7 @@ function openMonthPicker() {
   $('monthList').innerHTML = [...months].sort().reverse().map(m => {
     const t = derive.totals(m);
     const meta = t.spent > 0 ? `${fmt(t.spent)} spent` : (m > now ? 'Upcoming' : 'No activity');
-    return `<button type="button" class="month-cell ${m === view.month ? 'active' : ''} ${m === now ? 'is-today' : ''}" onclick="pickMonth('${m}')">
+    return `<button type="button" class="month-cell ${m === view.month ? 'active' : ''} ${m === now ? 'is-today' : ''}" data-action="pickMonth" data-month="${m}">
       <span class="mc-name">${escapeHtml(monthName(m))}</span>
       <span class="mc-meta">${escapeHtml(meta)}</span>
     </button>`;
@@ -898,13 +801,16 @@ function saveDinner(textarea) {
   autoGrow(textarea);
   const key = textarea.dataset.date;
   const value = textarea.value;
+  let emptied = false;
   commit(s => {
     const day = s.meals[key] || {};
     day.dinner = value;
     const empty = !value.trim() && !day.breakfast && !day.lunch && !day.notes;
-    if (empty) delete s.meals[key];
-    else      s.meals[key] = day;
+    if (empty) { delete s.meals[key]; emptied = true; }
+    else        s.meals[key] = day;
   }, { render: false });
+  if (emptied) sync.deleteMeal(key);
+  else         sync.upsertMeal(key, state.meals[key]);
 }
 
 /* -- Shopping list -------------------------------------------------------- */
@@ -924,20 +830,25 @@ function shopBucketIn(s, week, month = view.month) {
 function addShopItem() {
   const name = $('shopItem').value.trim();
   if (!name) return;
-  commit(s => shopBucketIn(s, view.shopWeek).push({ id: newId(), item: name, done: false }));
+  const item = { id: newId(), item: name, done: false };
+  commit(s => shopBucketIn(s, view.shopWeek).push(item));
+  sync.upsertShopItem(view.month, view.shopWeek, item);
   $('shopItem').value = '';
   $('shopItem').focus();
 }
 function toggleShop(id) {
+  let toggled = null;
   commit(s => {
     const it = shopBucketIn(s, view.shopWeek).find(i => i.id === id);
-    if (it) it.done = !it.done;
+    if (it) { it.done = !it.done; toggled = it; }
   });
+  if (toggled) sync.upsertShopItem(view.month, view.shopWeek, toggled);
 }
 function removeShop(id) {
   commit(s => {
     s.shopping[view.month][view.shopWeek] = shopBucketIn(s, view.shopWeek).filter(i => i.id !== id);
   });
+  sync.deleteShopItem(id);
 }
 
 /* -- Shopping context menu (right-click / long-press) -------------------- */
@@ -949,7 +860,7 @@ function openShopMenu(e, itemId) {
   const row = (action, w) => {
     const r = derive.shopWeekRange(w);
     const icon = action === 'copy' ? '⧉' : '→';
-    return `<button type="button" class="ctx-item" onclick="moveShopItem('${action}','${w}')">${icon}&nbsp; Week ${w} <span style="color:var(--text-dim);font-weight:500">· ${r.start}–${r.end}</span></button>`;
+    return `<button type="button" class="ctx-item" data-action="moveShopItem" data-mode="${action}" data-week="${w}">${icon}&nbsp; Week ${w} <span style="color:var(--text-dim);font-weight:500">· ${r.start}–${r.end}</span></button>`;
   };
   const menu = $('ctxMenu');
   menu.innerHTML =
@@ -969,17 +880,23 @@ function closeShopMenu() {
 }
 function moveShopItem(action, week) {
   const itemId = view.ctxId;
+  let copyItem = null;
+  let movedItem = null;
   commit(s => {
     const from = shopBucketIn(s, view.shopWeek);
     const item = from.find(i => i.id === itemId);
     if (!item) return;
     if (action === 'copy') {
-      shopBucketIn(s, week).push({ id: newId(), item: item.item, done: false });
+      copyItem = { id: newId(), item: item.item, done: false };
+      shopBucketIn(s, week).push(copyItem);
     } else {
-      shopBucketIn(s, week).push({ id: item.id, item: item.item, done: item.done });
+      movedItem = { id: item.id, item: item.item, done: item.done };
+      shopBucketIn(s, week).push(movedItem);
       s.shopping[view.month][view.shopWeek] = from.filter(i => i.id !== itemId);
     }
   });
+  if (copyItem)  sync.upsertShopItem(view.month, week, copyItem);
+  if (movedItem) sync.upsertShopItem(view.month, week, movedItem);  // PK is item id; new month/week overwrites
   closeShopMenu();
   snack(`${action === 'copy' ? 'Duplicated' : 'Moved'} to Week ${week}`);
 }
@@ -988,21 +905,24 @@ function moveShopItem(action, week) {
 
 function resetPlan() {
   if (!confirm('Reset all budget amounts to defaults? Meal plans and shopping list will be kept.')) return;
-  commit(s => { s.categories = structuredClone(DEFAULTS.categories); });
+  const defaults = structuredClone(DEFAULTS.categories);
+  const defaultIds = new Set(defaults.map(c => c.id));
+  // Delete categories the user added that aren't in DEFAULTS.
+  for (const cat of state.categories) {
+    if (!defaultIds.has(cat.id)) sync.deleteCategory(cat.id);
+  }
+  commit(s => { s.categories = defaults; });
+  // Re-upsert every default category to restore canonical values.
+  defaults.forEach((cat, i) => sync.upsertCategory(cat, i));
   snack('Plan reset');
 }
-function hardReset() {
-  if (!confirm('Wipe ALL data (plan, meals, shopping list, settings)?')) return;
+async function hardReset() {
+  if (!confirm('This signs you out. Your cloud data stays on the server — ask the admin to delete the household if you want it gone. Continue?')) return;
+  await auth.signOut();
+  state = blankState();
   localStorage.removeItem(STORE_KEY);
-  state = structuredClone(DEFAULTS);
-  view.month    = thisMonth();
-  view.week     = mondayOf(new Date());
-  view.shopWeek = '1';
-  view.editId   = null;
-  view.ctxId    = null;
-  render();
-  openOnboard(false);
-  snack('All data cleared');
+  showAuthModal('signin');
+  snack('Signed out');
 }
 
 /* ── 10. Snackbar ──────────────────────────────────────────────────────── */
@@ -1031,6 +951,85 @@ function snack(message) {
 
 /* ── 11. Global wiring & init ──────────────────────────────────────────── */
 
+/* The app uses a single delegated listener per event type rather than inline
+   handlers in markup. Every interactive element declares its intent via
+   `data-action` / `data-context-action` / `data-on-input`; the delegate()
+   helper looks up the named action below and invokes it.
+
+   Each action handler receives (event, dataset, element) and pulls whatever
+   arguments it needs out of the dataset — keeping the wiring declarative and
+   the action functions themselves unchanged. */
+
+const ACTIONS = {
+  // Screen / month nav
+  setView:           (_, d) => setView(d.view),
+  openMonthPicker, closeMonthPicker,
+  pickMonth:         (_, d) => pickMonth(d.month),
+  stepMonth:         (_, d) => stepMonth(+d.delta),
+
+  // Onboarding
+  openOnboard:       (_, d) => openOnboard(d.replan === 'true'),
+  closeOnboard, applyOnboard, toggleCofidis,
+
+  // Edit category sheet
+  openEdit:          (_, d) => openEdit(d.id),
+  closeEdit, saveEdit, deleteCategory, addEntry,
+  deleteEntry:       (_, d) => deleteEntry(d.id),
+  resetMonthBudget:   e     => resetMonthBudget(e),
+
+  // Lock toggles shared by edit + add modals
+  toggleLockClass:   (_, __, el) => el.classList.toggle('on'),
+
+  // Add category
+  openAdd, closeAdd, saveAdd,
+
+  // Settings
+  saveConfig, signOutNow, hardReset,
+
+  // Auth UI
+  setAuthTab:        (_, d) => setAuthTab(d.tab),
+  submitAuth,
+
+  // Food / dinner week nav
+  stepWeek:          (_, d) => stepWeek(+d.delta),
+  goToCurrentWeek,
+  setShopWeek:       (_, d) => setShopWeek(d.week),
+
+  // Shopping list
+  addShopItem,
+  toggleShop:        (_, d) => toggleShop(d.id),
+  removeShop:        (_, d) => removeShop(d.id),
+  moveShopItem:      (_, d) => moveShopItem(d.mode, d.week),
+
+  // Quick log (FAB)
+  openQuickLog, closeQuickLog,
+  pickCategory:      (_, d) => pickCategory(d.id),
+
+  // Budget view reset
+  resetPlan,
+};
+
+const CONTEXT_ACTIONS = {
+  openShopMenu: (e, d) => openShopMenu(e, d.id),
+};
+
+const INPUT_ACTIONS = {
+  saveDinner: (_, __, el) => saveDinner(el),
+};
+
+function delegate(eventName, attr, registry) {
+  document.addEventListener(eventName, e => {
+    const el = e.target.closest?.(`[${attr}]`);
+    if (!el) return;
+    const fn = registry[el.getAttribute(attr)];
+    if (fn) fn(e, el.dataset, el);
+  });
+}
+
+delegate('click',       'data-action',         ACTIONS);
+delegate('contextmenu', 'data-context-action', CONTEXT_ACTIONS);
+delegate('input',       'data-on-input',       INPUT_ACTIONS);
+
 // Enter submits the shopping and transaction inputs.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -1042,9 +1041,9 @@ document.addEventListener('keydown', e => {
 // Long-press on a shopping item opens its context menu on touch devices.
 let longPressTimer = null;
 document.addEventListener('touchstart', e => {
-  const row = e.target.closest?.('.shop-item[oncontextmenu]');
+  const row = e.target.closest?.('[data-context-action="openShopMenu"]');
   if (!row) return;
-  const id = (row.getAttribute('oncontextmenu').match(/'([^']+)'\)/) || [])[1];
+  const id = row.dataset.id;
   const t = e.touches[0];
   longPressTimer = setTimeout(
     () => openShopMenu({ preventDefault() {}, clientX: t.clientX, clientY: t.clientY }, id),
@@ -1059,7 +1058,17 @@ document.addEventListener('click', e => {
 });
 window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, true);
 
-// Boot.
-runMigrations();
-if (isFirstRun) openOnboard(false);
-render();
+/* ── 12. Auth UI handlers: see auth-ui.js ──────────────────────────────── */
+
+/* ── 13. Boot ──────────────────────────────────────────────────────────── */
+
+(async function boot() {
+  runMigrations();
+  render();   // render blank UI behind the auth modal so the page isn't empty
+  await auth.getSession();
+  if (cloud.session) {
+    await onAuthed();
+  } else {
+    showAuthModal('signin');
+  }
+})();
