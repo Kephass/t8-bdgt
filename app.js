@@ -76,6 +76,12 @@ const newId      = () => Date.now().toString(36) + Math.random().toString(36).sl
 const escapeHtml = s  => (s || '').replace(/[&<>"']/g,
   c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
+// Accept both `.` and `,` as decimal separator (Belgian/EU users type "12,34").
+function parseAmount(v) {
+  const n = parseFloat(String(v ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
 /* ── 3. Dates ────────────────────────────────────────────────────────────── */
 
 const pad2      = n => String(n).padStart(2, '0');
@@ -601,8 +607,8 @@ function closeOnboard()  { closeModal('onboard'); }
 function toggleCofidis() { $('cofidisToggle').classList.toggle('on'); }
 
 function applyOnboard() {
-  const income  = +$('incomeInput').value || 0;
-  const savings = +$('saveInput').value   || 0;
+  const income  = parseAmount($('incomeInput').value);
+  const savings = parseAmount($('saveInput').value);
   const cofidis = $('cofidisToggle').classList.contains('on');
   commit(s => {
     s.config.income   = income;
@@ -722,7 +728,7 @@ function closeEdit() {
 
 function saveEdit() {
   const cat = editingCategory(); if (!cat) return;
-  const budget = +$('editAmount').value || 0;
+  const budget = parseAmount($('editAmount').value);
   const note   = $('editNote').value;
   const locked = $('editLock').classList.contains('on');
   commit(s => {
@@ -745,7 +751,7 @@ function resetMonthBudget(e) {
 
 function addEntry() {
   const cat = editingCategory(); if (!cat) return;
-  const amount = parseFloat($('entryAmount').value);
+  const amount = parseAmount($('entryAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
   const note = $('entryNote').value.trim() || cat.name;
   commit(s => {
@@ -818,7 +824,7 @@ function saveAdd() {
     name,
     group:  $('addGroup').value,
     note:   '',
-    budget: +$('addAmount').value || 0,
+    budget: parseAmount($('addAmount').value),
     locked: $('addLock').classList.contains('on'),
     icon:   '•',
     color:  'grey',
@@ -831,8 +837,8 @@ function saveAdd() {
 /* -- Settings ------------------------------------------------------------- */
 
 function saveConfig() {
-  const income   = +$('cfgIncome').value   || 0;
-  const savings  = +$('cfgSavings').value  || 0;
+  const income   = parseAmount($('cfgIncome').value);
+  const savings  = parseAmount($('cfgSavings').value);
   const currency = $('cfgCurrency').value.trim() || '€';
   commit(s => { s.config.income = income; s.config.savings = savings; s.config.currency = currency; });
   snack('Settings saved');

@@ -21,11 +21,11 @@
     <p class="sub" id="onboardSub">Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.</p>
 
     <label class="label">Monthly income</label>
-    <input class="input num-input" id="incomeInput" type="number" min="0" step="1" placeholder="3209" />
+    <input class="input num-input" id="incomeInput" type="text" inputmode="decimal" placeholder="3209" />
     <p class="help">Felix + Valeria + any benefits coming into the joint account.</p>
 
     <label class="label">How much do you want to save?</label>
-    <input class="input num-input" id="saveInput" type="number" min="0" step="1" placeholder="100" />
+    <input class="input num-input" id="saveInput" type="text" inputmode="decimal" placeholder="100" />
     <p class="help">This is taken off the top, before allocating to discretionary spending.</p>
 
     <label class="label">Cofidis loan active?</label>
@@ -62,7 +62,7 @@
     <label class="label">Add a transaction</label>
     <div class="entry-add">
       <input class="input" id="entryNote" type="text" placeholder="Aldi, Q8, etc." />
-      <input class="input num-input" id="entryAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" style="width:110px" />
+      <input class="input num-input" id="entryAmount" type="text" inputmode="decimal" placeholder="0" style="width:110px" />
       <button class="add-btn" onclick="addEntry()" style="width:44px;height:44px;border-radius:12px">+</button>
     </div>
     <p class="help">Date defaults to today. Tap an entry below to edit or delete it.</p>
@@ -73,7 +73,7 @@
     <details style="margin-top:18px">
       <summary class="label" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">▸ Advanced</summary>
       <label class="label" id="editAmountLabel">Budget amount <span id="editBudgetScope" class="small" style="font-weight:500"></span></label>
-      <input class="input num-input" id="editAmount" type="number" min="0" step="1" />
+      <input class="input num-input" id="editAmount" type="text" inputmode="decimal" />
       <p class="help" id="editBudgetHelp" style="margin-top:6px"></p>
       <label class="label">Note</label>
       <input class="input" id="editNote" type="text" />
@@ -106,7 +106,7 @@
       <option value="discretionary">Discretionary</option>
     </select>
     <label class="label">Budget amount</label>
-    <input class="input num-input" id="addAmount" type="number" min="0" step="1" placeholder="50" />
+    <input class="input num-input" id="addAmount" type="text" inputmode="decimal" placeholder="50" />
     <div class="setup-row" style="margin-top:14px;border-radius:12px;background:var(--card);border:1px solid var(--line-soft)">
       <span class="label-inline">Locked (non-negotiable)</span>
       <div class="toggle" id="addLock" onclick="this.classList.toggle('on')"></div>
@@ -307,11 +307,11 @@
       <div class="card">
         <div class="setup-row">
           <span class="label-inline">Monthly income</span>
-          <input class="num-edit num" id="cfgIncome" type="number" min="0" />
+          <input class="num-edit num" id="cfgIncome" type="text" inputmode="decimal" />
         </div>
         <div class="setup-row">
           <span class="label-inline">Savings target / mo</span>
-          <input class="num-edit num" id="cfgSavings" type="number" min="0" />
+          <input class="num-edit num" id="cfgSavings" type="text" inputmode="decimal" />
         </div>
         <div class="setup-row">
           <span class="label-inline">Currency symbol</span>
@@ -382,6 +382,6 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
