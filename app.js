@@ -265,7 +265,39 @@ function renderHome() {
 function renderBudgetView() {
   const t = derive.totals();
   $('budgetRight').textContent  = `${fmt(t.spent)} / ${fmt(t.budgeted)}`;
+  renderSpendChart();
   $('budgetFullList').innerHTML = categoryRows(state.categories);
+}
+
+/** 'YYYY-MM' → 'May 26' — short month label for the chart. */
+function monthLabelShort(key) {
+  const d = new Date(key + '-15');
+  return `${d.toLocaleString('en-US', { month: 'short' })} ${String(d.getFullYear()).slice(-2)}`;
+}
+
+/** Six bars ending at MAX(view.month, thisMonth()). The selected month
+   (view.month) gets the dark pill. Tap a bar to jump to that month. */
+function renderSpendChart() {
+  const anchor = view.month > thisMonth() ? view.month : thisMonth();
+  const months = [];
+  for (let i = 5; i >= 0; i--) months.push(shiftMonth(anchor, -i));
+
+  const data = months.map(m => ({
+    key: m,
+    label: monthLabelShort(m),
+    spent: derive.totals(m).spent,
+    selected: m === view.month,
+  }));
+  const max = Math.max(1, ...data.map(d => d.spent));
+
+  $('spendChart').innerHTML = data.map(d => {
+    const pct = d.spent > 0 ? Math.max(8, Math.round((d.spent / max) * 100)) : 0;
+    return `<button type="button" class="sc-col ${d.selected ? 'selected' : ''}" data-action="pickMonth" data-month="${d.key}" aria-label="${escapeHtml(d.label)}: ${escapeHtml(fmt(d.spent))}">
+      <span class="sc-amt">${d.spent > 0 ? escapeHtml(fmt(d.spent)) : ''}</span>
+      <span class="sc-bar-wrap"><span class="sc-bar" style="height:${pct}%"></span></span>
+      <span class="sc-lbl">${escapeHtml(d.label)}</span>
+    </button>`;
+  }).join('');
 }
 
 function renderSetupView() {
@@ -477,6 +509,9 @@ const closeModal = id => {
 
 function setView(screen) {
   view.screen = screen;
+  // Expose the active screen on <body> so CSS can react to it (e.g. hide
+  // the month picker on the food tab, where it'd compete with the week nav).
+  document.body.dataset.screen = screen;
   for (const el of document.querySelectorAll('.view'))
     el.classList.toggle('active', el.id === 'view-' + screen);
   for (const el of document.querySelectorAll('nav.bottom .item'))
@@ -1168,6 +1203,8 @@ document.addEventListener('touchend', () => {
 /* ── 13. Boot ──────────────────────────────────────────────────────────── */
 
 (async function boot() {
+  // Reflect the initial active view on <body> (the HTML defaults to home).
+  document.body.dataset.screen = 'home';
   runMigrations();
   render();   // render blank UI behind the auth modal so the page isn't empty
   await auth.getSession();
