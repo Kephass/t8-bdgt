@@ -248,6 +248,48 @@ function renderHome() {
 
   $('categoryGroups').innerHTML =
     ['fixed','essentials','discretionary'].map(categoryGroupSummary).join('');
+
+  renderSnapshotTiles();
+}
+
+/** Two side-by-side tiles below the categories card:
+   1. Bills & utilities — how much of this month's fixed bills are still owed
+      (fixed budgets minus what's already been logged), with a progress bar.
+   2. Savings — the monthly target + an annualised "if kept" projection.
+   The savings actuals aren't tracked yet so the bar is informational only. */
+function renderSnapshotTiles() {
+  const fixed = state.categories.filter(c => c.group === 'fixed');
+  const fixedBudget = fixed.reduce((t, c) => t + derive.budget(c), 0);
+  const fixedSpent  = fixed.reduce((t, c) => t + derive.spent(c.id), 0);
+  const fixedLeft   = Math.max(0, fixedBudget - fixedSpent);
+  const billsPct    = fixedBudget > 0 ? Math.min(100, (fixedSpent / fixedBudget) * 100) : 0;
+  $('billsLeft').textContent      = `${fmt(fixedLeft)} left`;
+  $('billsSub').textContent       = `${fmt(fixedSpent)} of ${fmt(fixedBudget)} paid`;
+  $('billsBarFill').style.width   = `${billsPct.toFixed(1)}%`;
+
+  // Surplus = income − total budgeted − monthly savings target. The same
+  // "slack / over-spend" line the old Summary card showed: positive means
+  // you'd finish the month with money left if you stuck to budgets.
+  const income   = +state.config.income  || 0;
+  const savings  = +state.config.savings || 0;
+  const totals   = derive.totals();
+  const surplus  = income - totals.budgeted - savings;
+  const surplusAmtEl = $('surplusAmt');
+  const surplusBarEl = $('surplusBarFill');
+  surplusAmtEl.textContent = fmt(surplus);
+  surplusAmtEl.classList.toggle('over', surplus < 0);
+  surplusBarEl.classList.toggle('over', surplus < 0);
+  // Bar: when positive, fill proportional to share of income. When negative,
+  // show a thin red sliver so the alert is visible without overwhelming.
+  const barPct = income > 0
+    ? (surplus >= 0
+        ? Math.min(100, (surplus / income) * 100)
+        : Math.min(100, (-surplus / income) * 100))
+    : 0;
+  surplusBarEl.style.width = `${barPct.toFixed(1)}%`;
+  $('surplusSub').textContent = surplus >= 0
+    ? `${fmt(income)} − ${fmt(totals.budgeted)} − ${fmt(savings)}`
+    : `${fmt(-surplus)} over income`;
 }
 
 /** Cumulative-spend area chart for view.month. Shows the running total
