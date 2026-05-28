@@ -84,8 +84,16 @@
 <div class="modal" id="editModal">
   <div class="sheet">
     <div class="grab"></div>
-    <h2 id="editTitle">Edit</h2>
-    <p class="sub" id="editSub"></p>
+    <div class="edit-head">
+      <div>
+        <h2 id="editTitle">Edit</h2>
+        <p class="sub" id="editSub"></p>
+      </div>
+      <button class="overflow-btn" data-action="toggleEditMenu" aria-label="More" aria-haspopup="menu">⋯</button>
+      <div class="overflow-menu" id="editMenu" hidden role="menu">
+        <button class="om-item danger" data-action="deleteCategory" role="menuitem">Delete category</button>
+      </div>
+    </div>
 
     <!-- Big remaining display -->
     <div class="remaining-card">
@@ -101,10 +109,11 @@
     <label class="label">Add a transaction</label>
     <div class="entry-add">
       <input class="input" id="entryNote" type="text" placeholder="Aldi, Q8, etc." />
-      <input class="input num-input" id="entryAmount" type="text" inputmode="decimal" placeholder="0" style="width:110px" />
+      <input class="input" id="entryDate" type="date" style="width:140px" />
+      <input class="input num-input" id="entryAmount" type="text" inputmode="decimal" placeholder="0" style="width:90px" />
       <button class="add-btn" data-action="addEntry" style="width:44px;height:44px;border-radius:12px">+</button>
     </div>
-    <p class="help">Date defaults to today. Tap an entry below to edit or delete it.</p>
+    <p class="help">Tap an entry below to edit or delete it.</p>
 
     <!-- Entries list -->
     <div class="entries-wrap" id="entriesWrap"></div>
@@ -123,8 +132,7 @@
     </details>
 
     <div class="btn-row" style="margin:18px 0 0">
-      <button class="btn danger" data-action="deleteCategory">Delete</button>
-      <button class="btn ghost btn-block" data-action="closeEdit">Done</button>
+      <button class="btn ghost btn-block" data-action="closeEdit">Cancel</button>
       <button class="btn primary btn-block" data-action="saveEdit">Save</button>
     </div>
   </div>
@@ -178,7 +186,7 @@
       <div class="month">Family budget</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <span id="syncStatus" class="sync-pill" data-kind="ok">Synced</span>
+      <button id="syncStatus" type="button" class="sync-pill" data-kind="ok" data-action="showSyncStatus" title="Sync status">Synced</button>
       <button id="refreshBtn" type="button" class="refresh-btn" data-action="refresh" aria-label="Refresh from cloud" title="Refresh">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 1 1-3.2-6.9"/>
@@ -210,14 +218,8 @@
 
   <!-- ===== HOME VIEW ===== -->
   <section class="view active" id="view-home">
-    <div class="hero">
-      <div class="label">Available to spend</div>
-      <div class="balance num"><span id="heroAmount">€0</span></div>
-      <div class="sub">
-        <span class="pill" id="heroPill">+€0 / month</span>
-        <span id="heroNote">after fixed bills & savings</span>
-      </div>
-    </div>
+    <!-- Cumulative-spend area chart (vs same point last month). -->
+    <div class="card hero-chart" id="heroChart" data-action="setView" data-view="budget" role="button" aria-label="View budget detail"></div>
 
     <div class="row3">
       <div class="stat">
@@ -230,40 +232,19 @@
         <div class="delta" id="statSpentDelta"></div>
       </div>
       <div class="stat">
-        <div class="k">Saved</div>
+        <div class="k">Savings target</div>
         <div class="v num" id="statSaved">€0</div>
-        <div class="delta pos" id="statSavedDelta"></div>
       </div>
     </div>
 
     <div class="section">
-      <h2>Non-negotiables <span class="right" id="fixedRight">€0 / mo</span></h2>
-      <div class="card" id="fixedList"></div>
-    </div>
-
-    <div class="section">
-      <h2>Food &amp; essentials <span class="right" id="essRight">€0 / mo</span></h2>
-      <div class="card" id="essList"></div>
-    </div>
-
-    <div class="section">
-      <h2>Discretionary <span class="right" id="discRight">€0 / mo</span></h2>
-      <div class="card" id="discList"></div>
+      <h2>Categories</h2>
+      <div class="card" id="categoryGroups"></div>
     </div>
 
     <div class="btn-row">
       <button class="btn ghost btn-block" data-action="openOnboard" data-replan="true">Re-plan month</button>
       <button class="btn primary btn-block" data-action="openAdd">+ Add</button>
-    </div>
-
-    <div class="section" style="margin-top:24px">
-      <h2>Summary</h2>
-      <div class="card">
-        <div class="row"><div class="icon green">↓</div><div class="meta"><div class="name">Income</div><div class="note">Money in</div></div><div class="amt num" id="sumIn">€0</div></div>
-        <div class="row"><div class="icon red">↑</div><div class="meta"><div class="name">Total budgeted</div><div class="note">Fixed + essentials + discretionary</div></div><div class="amt num" id="sumOut">€0</div></div>
-        <div class="row"><div class="icon blue">★</div><div class="meta"><div class="name">Savings target</div><div class="note">Auto-transferred to emergency</div></div><div class="amt num" id="sumSave">€0</div></div>
-        <div class="row"><div class="icon amber">=</div><div class="meta"><div class="name">Slack / over-spend</div><div class="note">Income − budget − savings</div></div><div class="amt num" id="sumSlack">€0</div></div>
-      </div>
     </div>
   </section>
 
@@ -273,8 +254,16 @@
       <h2>Spending</h2>
       <div class="card spend-chart" id="spendChart" aria-label="Monthly spending chart"></div>
     </div>
+
+    <div class="filter-chips" id="budgetFilters" role="group" aria-label="Filter categories">
+      <button type="button" class="chip active" data-action="setBudgetFilter" data-filter="all">All</button>
+      <button type="button" class="chip"        data-action="setBudgetFilter" data-filter="fixed">Fixed</button>
+      <button type="button" class="chip"        data-action="setBudgetFilter" data-filter="essentials">Essentials</button>
+      <button type="button" class="chip"        data-action="setBudgetFilter" data-filter="discretionary">Discretionary</button>
+    </div>
+
     <div class="section">
-      <h2><span>This month</span> <span class="right" id="budgetRight">€0 budgeted</span></h2>
+      <h2><span id="budgetMonthLabel">This month</span> <span class="right" id="budgetRight">€0 budgeted</span></h2>
       <div class="card" id="budgetFullList"></div>
     </div>
     <div class="btn-row">
@@ -289,7 +278,8 @@
   <!-- ===== FOOD VIEW ===== -->
   <section class="view" id="view-food">
     <div class="section" style="margin-top:8px">
-      <h2>Dinner planner</h2>
+      <h2>Dinner planner <button class="btn-mini" data-action="copyLastWeek" title="Copy last week's dinners">⎘ Last week</button></h2>
+      <div class="meal-chips" id="mealChips" aria-label="Recent meals"></div>
     </div>
 
     <!-- Week selector — chevrons + tap to jump to current week -->
@@ -312,6 +302,7 @@
 
     <div class="section">
       <h2>Shopping list <span class="right" id="shopWeekRight"></span></h2>
+      <p class="shop-budget-line" id="shopBudgetLine"></p>
     </div>
     <div class="tabs" id="shopWeekTabs">
       <button type="button" data-week="1" class="active" data-action="setShopWeek"><span class="wk-n">Week 1</span><span class="wk-d" data-range="1"></span></button>
@@ -329,45 +320,25 @@
       </div>
     </div>
 
-    <div class="section" style="margin-bottom:24px">
-      <h2>Grocery budget</h2>
-      <div class="card">
-        <div class="row">
-          <div class="icon green">🛒</div>
-          <div class="meta">
-            <div class="name">Weekly target</div>
-            <div class="note">Family of 5 — Colruyt/Aldi</div>
-          </div>
-          <div class="amt num" id="weeklyTarget">€140</div>
-        </div>
-        <div class="row">
-          <div class="icon blue">∑</div>
-          <div class="meta">
-            <div class="name">Month so far</div>
-            <div class="note">Logged grocery spend (Actual)</div>
-          </div>
-          <div class="amt num" id="monthGroceries">€0</div>
-        </div>
-      </div>
-    </div>
   </section>
 
   <!-- ===== SETUP VIEW ===== -->
   <section class="view" id="view-setup">
     <div class="section" style="margin-top:8px">
       <h2>Plan</h2>
+      <p class="help" style="margin:0 0 10px 4px">Changes save automatically.</p>
       <div class="card">
         <div class="setup-row">
           <span class="label-inline">Monthly income</span>
-          <input class="num-edit num" id="cfgIncome" type="text" inputmode="decimal" />
+          <input class="num-edit num" id="cfgIncome" type="text" inputmode="decimal" data-on-change="autoSaveConfig" />
         </div>
         <div class="setup-row">
           <span class="label-inline">Savings target / mo</span>
-          <input class="num-edit num" id="cfgSavings" type="text" inputmode="decimal" />
+          <input class="num-edit num" id="cfgSavings" type="text" inputmode="decimal" data-on-change="autoSaveConfig" />
         </div>
         <div class="setup-row">
           <span class="label-inline">Currency symbol</span>
-          <input class="num-edit" id="cfgCurrency" type="text" style="text-align:center;width:60px" maxlength="3" />
+          <input class="num-edit" id="cfgCurrency" type="text" style="text-align:center;width:60px" maxlength="3" data-on-change="autoSaveConfig" />
         </div>
       </div>
     </div>
@@ -379,36 +350,36 @@
           <span class="label-inline">Signed in as</span>
           <span class="num" id="acctEmail" style="color:var(--text-dim);font-size:13px">—</span>
         </div>
-        <div class="setup-row">
+        <div class="setup-row invite-row">
           <span class="label-inline">Invite code</span>
-          <span class="num" id="acctInvite" style="font-family:ui-monospace,monospace;letter-spacing:2px">—</span>
+          <div class="invite-actions">
+            <span class="num" id="acctInvite" style="font-family:ui-monospace,monospace;letter-spacing:2px">—</span>
+            <button class="btn-mini" data-action="copyInvite" title="Copy code" aria-label="Copy invite code">⎘</button>
+            <button class="btn-mini" data-action="rotateInvite" title="Generate a new code" aria-label="Rotate invite code">↻</button>
+          </div>
         </div>
         <div class="setup-row" style="border:none">
-          <span class="label-inline" style="color:var(--text-dim);font-size:12px">Share this code with your partner so they can join the same budget.</span>
+          <span class="label-inline" style="color:var(--text-dim);font-size:12px">Share this code with your partner so they can join the same budget. Rotating creates a new code and invalidates the old one.</span>
         </div>
-      </div>
-      <div class="btn-row" style="margin-top:10px">
-        <button class="btn ghost btn-block" data-action="signOutNow">Sign out</button>
       </div>
     </div>
 
     <div class="section">
-      <h2>Recurring obligations</h2>
-      <p class="help" style="margin:0 0 10px 4px">Tap any item to edit amount or lock status. Locked items are protected when you re-plan a month.</p>
-      <div class="card" id="setupAll"></div>
+      <h2>Members</h2>
+      <div class="card" id="membersCard"><div class="empty">Loading members…</div></div>
     </div>
 
-    <div class="btn-row">
-      <button class="btn primary btn-block" data-action="saveConfig">Save settings</button>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn ghost btn-block" data-action="signOutNow">Sign out</button>
     </div>
 
     <div class="danger-zone">
-      <p><b>Reset everything</b> — clears the budget, meal plans, shopping list, and configuration. You'll go back to the onboarding screen with default values.</p>
-      <button class="btn danger btn-block" data-action="hardReset">Wipe all data</button>
+      <p><b>Reset everything</b> — signs you out and clears local data. Your cloud household stays intact; an admin must delete it via Supabase to wipe the shared data.</p>
+      <button class="btn danger btn-block" data-action="hardReset">Wipe local data &amp; sign out</button>
     </div>
 
     <div style="text-align:center;color:var(--text-dim);font-size:11px;margin:30px 0 18px;line-height:1.5">
-      Family Budget · all data stays on this device (localStorage)<br>
+      Family Budget · synced across your household<br>
       Built for the Oduro Fosu – Dos Santos Lima household.
     </div>
   </section>
@@ -467,9 +438,9 @@
      functions that app.js's boot() calls at the bottom. -->
 <script src="config.js"></script>
 <script src="defaults.js?v=1"></script>
-<script src="cloud.js?v=2"></script>
+<script src="cloud.js?v=3"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=1"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

@@ -87,12 +87,13 @@ let state = load();
 
 /** Ephemeral UI state — never persisted. */
 const view = {
-  screen:   'home',
-  month:    thisMonth(),
-  week:     mondayOf(new Date()),
-  shopWeek: '1',
-  editId:   null,
-  ctxId:    null,
+  screen:       'home',
+  month:        thisMonth(),
+  week:         mondayOf(new Date()),
+  shopWeek:     '1',
+  editId:       null,
+  ctxId:        null,
+  budgetFilter: 'all',   // all | fixed | essentials | discretionary
 };
 
 function blankState() {
@@ -232,15 +233,11 @@ function renderHeaderPicker() {
 
 function renderHome() {
   const t = derive.totals();
-  const income    = +state.config.income  || 0;
-  const savings   = +state.config.savings || 0;
+  const income  = +state.config.income  || 0;
+  const savings = +state.config.savings || 0;
   const remaining = t.budgeted - t.spent;
 
-  $('heroAmount').textContent = fmt(remaining);
-  const pill = $('heroPill');
-  pill.classList.toggle('bad', remaining < 0);
-  pill.textContent = remaining >= 0 ? `${fmt(t.spent)} spent` : `${fmt(-remaining)} over`;
-  $('heroNote').textContent = remaining >= 0 ? `of ${fmt(t.budgeted)} budgeted` : 'budget exceeded';
+  renderHomeHeroChart();
 
   $('statIncome').textContent = fmt(income);
   $('statSpent').textContent  = fmt(t.spent);
@@ -249,24 +246,135 @@ function renderHome() {
   delta.textContent = remaining >= 0 ? `${fmt(remaining)} left` : `${fmt(-remaining)} over`;
   delta.className   = 'delta ' + (remaining >= 0 ? 'pos' : 'neg');
 
-  $('fixedRight').textContent = fmt(t.fixed);
-  $('essRight').textContent   = fmt(t.ess);
-  $('discRight').textContent  = fmt(t.disc);
-  $('fixedList').innerHTML = categoryRows(state.categories.filter(c => c.group === 'fixed'));
-  $('essList').innerHTML   = categoryRows(state.categories.filter(c => c.group === 'essentials'));
-  $('discList').innerHTML  = categoryRows(state.categories.filter(c => c.group === 'discretionary'));
+  $('categoryGroups').innerHTML =
+    ['fixed','essentials','discretionary'].map(categoryGroupSummary).join('');
+}
 
-  $('sumIn').textContent    = fmt(income);
-  $('sumOut').textContent   = fmt(t.budgeted);
-  $('sumSave').textContent  = fmt(savings);
-  $('sumSlack').textContent = fmt(income - t.budgeted - savings);
+/** Cumulative-spend area chart for view.month. Shows the running total
+   to the cutoff day (today if viewing the current month, else end of
+   month), plus a delta vs. last month at the same day-of-month. */
+function renderHomeHeroChart() {
+  const month = view.month;
+  const [y, m] = month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const isCurrent = month === thisMonth();
+  const cutoffDay = isCurrent ? +today().slice(-2) : daysInMonth;
+
+  // Per-day totals + cumulative
+  const dayTotals = new Array(daysInMonth + 1).fill(0);
+  const monthEntries = Object.values(state.entries[month] || {}).flat();
+  for (const e of monthEntries) {
+    const day = +(e.date || '').slice(-2);
+    if (day >= 1 && day <= daysInMonth) dayTotals[day] += (+e.amount || 0);
+  }
+  const cum = new Array(daysInMonth + 1).fill(0);
+  for (let i = 1; i <= daysInMonth; i++) cum[i] = cum[i - 1] + dayTotals[i];
+  const total = cum[cutoffDay] || 0;
+
+  // Same-window total in previous month for the delta line
+  const prevMonth = shiftMonth(month, -1);
+  let prevTotal = 0;
+  const prevEntries = Object.values(state.entries[prevMonth] || {}).flat();
+  for (const e of prevEntries) {
+    const day = +(e.date || '').slice(-2);
+    if (day >= 1 && day <= cutoffDay) prevTotal += (+e.amount || 0);
+  }
+  const delta = total - prevTotal;
+  const showDelta = prevTotal > 0;
+  let deltaHTML = '';
+  if (showDelta) {
+    const cls   = delta <= 0 ? 'pos' : 'neg';
+    const tick  = delta <= 0 ? '✓'   : '↑';
+    const label = delta === 0 ? 'Same as last month'
+                : delta <  0 ? `${fmt(-delta)} below last month`
+                             : `${fmt(delta)} above last month`;
+    deltaHTML = `<div class="hc-delta ${cls}"><span class="hc-tick">${tick}</span>${escapeHtml(label)}</div>`;
+  }
+
+  // SVG path — viewBox is fixed (W×H), CSS stretches it via preserveAspectRatio="none"
+  const W = 320, H = 96;
+  const max = Math.max(1, cum[cutoffDay] || 1);
+  const xFor = day => daysInMonth > 1 ? ((day - 1) / (daysInMonth - 1)) * W : W / 2;
+  const yFor = val => H - (val / max) * (H - 6) - 3;
+  const points = [];
+  for (let i = 1; i <= cutoffDay; i++) points.push([xFor(i), yFor(cum[i])]);
+  if (points.length === 1) points.unshift([0, yFor(0)]);  // need 2 points for a visible stroke
+  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const lastX = points[points.length - 1][0];
+  const area = `${line} L${lastX.toFixed(1)} ${H} L${points[0][0].toFixed(1)} ${H} Z`;
+  const dotX = lastX.toFixed(1);
+  const dotY = points[points.length - 1][1].toFixed(1);
+
+  const periodLabel = isCurrent ? 'this month' : monthName(month).toLowerCase();
+
+  $('heroChart').innerHTML = `
+    <div class="hc-top">
+      <div>
+        <div class="hc-label">Current spend ${escapeHtml(periodLabel)}</div>
+        <div class="hc-amt num">${escapeHtml(fmt(total))}</div>
+      </div>
+      ${deltaHTML}
+    </div>
+    <div class="hc-chart-wrap">
+      <svg class="hc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="hcGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--green)" stop-opacity=".35"/>
+            <stop offset="100%" stop-color="var(--green)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${area}" fill="url(#hcGrad)"/>
+        <path d="${line}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${dotX}" cy="${dotY}" r="5" fill="var(--green)"/>
+        <circle cx="${dotX}" cy="${dotY}" r="2.5" fill="var(--bg)"/>
+      </svg>
+    </div>
+  `;
+}
+
+/** One collapsed row per group: title + spent/budget + stacked top-categories bar.
+   Tap a row to jump to the Budget tab with that group filtered. */
+function categoryGroupSummary(group) {
+  const labels = { fixed: 'Non-negotiables', essentials: 'Food & essentials', discretionary: 'Discretionary' };
+  const cats = state.categories.filter(c => c.group === group);
+  let budgetSum = 0, spentSum = 0;
+  for (const c of cats) {
+    budgetSum += derive.budget(c);
+    spentSum  += derive.spent(c.id);
+  }
+  const segs = cats
+    .map(c => ({ color: c.color || 'grey', spent: derive.spent(c.id), name: c.name }))
+    .filter(s => s.spent > 0)
+    .sort((a, b) => b.spent - a.spent);
+  const segSum = segs.reduce((t, s) => t + s.spent, 0) || 1;
+  const segHTML = segs.length
+    ? segs.map(s =>
+        `<span class="cgr-seg ${escapeHtml(s.color)}" style="width:${(s.spent / segSum * 100).toFixed(1)}%" title="${escapeHtml(s.name)}: ${escapeHtml(fmt(s.spent))}"></span>`
+      ).join('')
+    : '';
+  return `<button class="cat-group-row" data-action="goToGroup" data-group="${group}" aria-label="${escapeHtml(labels[group])}">
+    <div class="cgr-head">
+      <div class="cgr-name">${escapeHtml(labels[group])}</div>
+      <div class="cgr-amts num"><span class="cgr-spent">${escapeHtml(fmt(spentSum))}</span><span class="cgr-budget">/ ${escapeHtml(fmt(budgetSum))}</span></div>
+    </div>
+    <div class="cgr-bar">${segHTML || '<span class="cgr-seg grey" style="width:0%"></span>'}</div>
+  </button>`;
 }
 
 function renderBudgetView() {
+  // Filter chip active states
+  for (const c of document.querySelectorAll('#budgetFilters .chip')) {
+    c.classList.toggle('active', c.dataset.filter === view.budgetFilter);
+  }
+  const cats = view.budgetFilter === 'all'
+    ? state.categories
+    : state.categories.filter(c => c.group === view.budgetFilter);
   const t = derive.totals();
   $('budgetRight').textContent  = `${fmt(t.spent)} / ${fmt(t.budgeted)}`;
+  const monthLbl = $('budgetMonthLabel');
+  if (monthLbl) monthLbl.textContent = view.month === thisMonth() ? 'This month' : monthName(view.month);
   renderSpendChart();
-  $('budgetFullList').innerHTML = categoryRows(state.categories);
+  $('budgetFullList').innerHTML = categoryRows(cats);
 }
 
 /** 'YYYY-MM' → 'May 26' — short month label for the chart. */
@@ -275,36 +383,72 @@ function monthLabelShort(key) {
   return `${d.toLocaleString('en-US', { month: 'short' })} ${String(d.getFullYear()).slice(-2)}`;
 }
 
-/** Six bars ending at MAX(view.month, thisMonth()). The selected month
-   (view.month) gets the dark pill. Tap a bar to jump to that month. */
+/** Six pairs of bars ending at MAX(view.month, thisMonth()):
+   an outlined "budget" bar + a solid green "spent" bar per month.
+   Selected month (view.month) gets the dark pill on the label. */
 function renderSpendChart() {
   const anchor = view.month > thisMonth() ? view.month : thisMonth();
   const months = [];
   for (let i = 5; i >= 0; i--) months.push(shiftMonth(anchor, -i));
 
-  const data = months.map(m => ({
-    key: m,
-    label: monthLabelShort(m),
-    spent: derive.totals(m).spent,
-    selected: m === view.month,
-  }));
-  const max = Math.max(1, ...data.map(d => d.spent));
+  const data = months.map(m => {
+    const totals = derive.totals(m);
+    return {
+      key: m,
+      label: monthLabelShort(m),
+      spent: totals.spent,
+      budget: totals.budgeted,
+      selected: m === view.month,
+    };
+  });
+  const max = Math.max(1, ...data.flatMap(d => [d.spent, d.budget]));
 
   $('spendChart').innerHTML = data.map(d => {
-    const pct = d.spent > 0 ? Math.max(8, Math.round((d.spent / max) * 100)) : 0;
-    return `<button type="button" class="sc-col ${d.selected ? 'selected' : ''}" data-action="pickMonth" data-month="${d.key}" aria-label="${escapeHtml(d.label)}: ${escapeHtml(fmt(d.spent))}">
+    const spentPct  = d.spent  > 0 ? Math.max(6, Math.round((d.spent  / max) * 100)) : 0;
+    const budgetPct = d.budget > 0 ? Math.max(6, Math.round((d.budget / max) * 100)) : 0;
+    return `<button type="button" class="sc-col ${d.selected ? 'selected' : ''}" data-action="pickMonth" data-month="${d.key}" aria-label="${escapeHtml(d.label)}: ${escapeHtml(fmt(d.spent))} of ${escapeHtml(fmt(d.budget))}">
       <span class="sc-amt">${d.spent > 0 ? escapeHtml(fmt(d.spent)) : ''}</span>
-      <span class="sc-bar-wrap"><span class="sc-bar" style="height:${pct}%"></span></span>
+      <span class="sc-bar-wrap">
+        <span class="sc-bar sc-bar-budget" style="height:${budgetPct}%"></span>
+        <span class="sc-bar sc-bar-spent"  style="height:${spentPct}%"></span>
+      </span>
       <span class="sc-lbl">${escapeHtml(d.label)}</span>
     </button>`;
   }).join('');
 }
 
 function renderSetupView() {
-  $('cfgIncome').value    = state.config.income;
-  $('cfgSavings').value   = state.config.savings;
-  $('cfgCurrency').value  = state.config.currency;
-  $('setupAll').innerHTML = categoryRows(state.categories);
+  $('cfgIncome').value   = state.config.income;
+  $('cfgSavings').value  = state.config.savings;
+  $('cfgCurrency').value = state.config.currency;
+  renderMembers();   // async; fills #membersCard when it returns
+}
+
+/** Pull household members via the list_household_members RPC. Fire-and-forget;
+   on error we surface a readable message inline. */
+async function renderMembers() {
+  const card = $('membersCard');
+  if (!card) return;
+  if (!cloud.householdId) { card.innerHTML = '<div class="empty">Sign in to view members</div>'; return; }
+  try {
+    const members = await auth.listMembers();
+    if (!members.length) { card.innerHTML = '<div class="empty">No members yet</div>'; return; }
+    card.innerHTML = members.map(m => {
+      const joined = m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      const youTag = m.is_me ? ' <span style="color:var(--text-dim);font-weight:500">(you)</span>' : '';
+      const kickBtn = m.is_me ? '' :
+        `<button class="btn-mini danger" data-action="removeMember" data-user="${escapeHtml(m.user_id)}" aria-label="Remove member">✕</button>`;
+      return `<div class="member-row">
+        <div class="member-info">
+          <div class="member-email">${escapeHtml(m.email || '—')}${youTag}</div>
+          <div class="member-joined">Joined ${escapeHtml(joined)}</div>
+        </div>
+        ${kickBtn}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    card.innerHTML = `<div class="empty">Couldn't load members: ${escapeHtml(e.message || String(e))}</div>`;
+  }
 }
 
 /** One row per category, with progress bar and spend stats. */
@@ -349,11 +493,35 @@ function categoryRows(cats) {
 
 function renderFoodView() {
   renderWeekNav();
+  renderMealChips();
   renderDinnerWeek();
   renderShopTabs();
   renderShoppingList();
-  $('monthGroceries').textContent = fmt(derive.spent('groceries'));
-  $('weeklyTarget').textContent   = fmt(Math.round(derive.budgetById('groceries') / 4.33));
+  // Shopping-list budget hint replaces the old standalone "Grocery budget" card.
+  const weekly = fmt(Math.round(derive.budgetById('groceries') / 4.33));
+  const monthly = fmt(derive.spent('groceries'));
+  const monthLbl = view.month === thisMonth() ? 'this month' : monthName(view.month).toLowerCase();
+  const line = $('shopBudgetLine');
+  if (line) line.textContent = `${weekly} weekly target · ${monthly} ${monthLbl}`;
+}
+
+/** Top 5 most-frequent dinner texts across all stored meals. Rendered as
+   tap-to-fill chips above the dinner planner. */
+function topDinners(n = 5) {
+  const counts = new Map();
+  for (const key in state.meals) {
+    const d = (state.meals[key]?.dinner || '').trim();
+    if (!d) continue;
+    counts.set(d, (counts.get(d) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]);
+}
+
+function renderMealChips() {
+  const chips = topDinners();
+  $('mealChips').innerHTML = chips.map(m =>
+    `<button class="meal-chip" data-action="quickAddMeal" data-meal="${escapeHtml(m)}" title="Add to next empty day">${escapeHtml(m)}</button>`
+  ).join('');
 }
 
 function renderWeekNav() {
@@ -654,6 +822,10 @@ function openEdit(id) {
   $('editLock').classList.toggle('on', !!cat.locked);
   $('entryNote').value   = '';
   $('entryAmount').value = '';
+  // Seed date input — today's date if viewing the current month, else the 15th.
+  $('entryDate').value = view.month === thisMonth() ? today() : `${view.month}-15`;
+  // Make sure the overflow menu is closed when reopening.
+  const em = $('editMenu'); if (em) em.hidden = true;
   renderEditSheet();
   openModal('editModal');
   setTimeout(() => $('entryAmount').focus(), 80);
@@ -697,21 +869,24 @@ function addEntry() {
   const amount = parseAmount($('entryAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
   const note = $('entryNote').value.trim() || cat.name;
-  // Date must fall inside view.month — otherwise cloud's month_key (derived
-  // from the date) ends up in the wrong bucket and on reload hydrate()
-  // collapses the entry into the current month. Use today when we're
-  // already viewing the current month, the 15th of the viewed month
-  // otherwise (always a valid day, sits comfortably mid-month).
-  const date = view.month === thisMonth() ? today() : `${view.month}-15`;
+  // Read the date from the picker. cloud's month_key is derived from this
+  // date.slice(0,7), so the entry's month bucket follows the date directly.
+  // The local state.entries bucket is keyed by entry.date.slice(0,7) too,
+  // not view.month — so entries written for a different month than the one
+  // currently being viewed still land in the right place locally.
+  const fallback = view.month === thisMonth() ? today() : `${view.month}-15`;
+  const date = $('entryDate').value || fallback;
+  const monthKey = date.slice(0, 7);
   const entry = { id: newId(), amount, note, date };
   commit(s => {
-    const list = ((s.entries[view.month] ||= {})[cat.id] ||= []);
+    const list = ((s.entries[monthKey] ||= {})[cat.id] ||= []);
     list.push(entry);
   });
   sync.upsertEntry(cat.id, entry);
   $('entryNote').value   = '';
   $('entryAmount').value = '';
-  snack(`${fmt(amount)} logged`);
+  $('entryDate').value   = fallback;
+  snack(`${fmt(amount)} logged${monthKey !== view.month ? ' in ' + monthName(monthKey) : ''}`);
   setTimeout(() => $('entryAmount').focus(), 50);
 }
 
@@ -790,13 +965,52 @@ function saveAdd() {
 
 /* -- Settings ------------------------------------------------------------- */
 
-function saveConfig() {
+/** Persist the Plan inputs. `quiet=true` suppresses the snack — used by the
+   auto-save-on-blur flow so every field change doesn't spawn a toast. */
+function saveConfig(quiet = false) {
   const income   = parseAmount($('cfgIncome').value);
   const savings  = parseAmount($('cfgSavings').value);
   const currency = $('cfgCurrency').value.trim() || '€';
   commit(s => { s.config.income = income; s.config.savings = savings; s.config.currency = currency; });
   sync.updateConfig({ income, savings, currency });
-  snack('Settings saved');
+  if (!quiet) snack('Settings saved');
+}
+
+async function copyInvite() {
+  const code = cloud.inviteCode;
+  if (!code) { snack('No invite code yet'); return; }
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Family Budget invite', text: `Join our household budget — invite code: ${code}` });
+      return;
+    }
+    await navigator.clipboard.writeText(code);
+    snack('Code copied');
+  } catch {
+    snack('Copy failed — select the code manually');
+  }
+}
+
+async function rotateInvite() {
+  if (!confirm('Generate a new invite code? The old code stops working immediately. Existing members keep their access.')) return;
+  try {
+    const newCode = await auth.rotateInviteCode();
+    $('acctInvite').textContent = newCode;
+    snack('Invite code rotated');
+  } catch (e) {
+    snack('Rotate failed: ' + (e.message || e));
+  }
+}
+
+async function removeMember(userId) {
+  if (!confirm("Remove this member? They lose access to the household immediately.")) return;
+  try {
+    await auth.removeMember(userId);
+    snack('Member removed');
+    renderMembers();
+  } catch (e) {
+    snack('Remove failed: ' + (e.message || e));
+  }
 }
 
 /* -- Month navigation (the top picker) ----------------------------------- */
@@ -847,6 +1061,62 @@ function goToCurrentWeek() {
   view.week = mondayOf(new Date());
   renderFoodView();
   snack('This week');
+}
+
+/** Copy each day's dinner from the previous week into the current week's
+   same day-of-week. Skips days that already have a dinner set. */
+function copyLastWeek() {
+  let count = 0;
+  const dayKeys = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(view.week);  cur.setDate(cur.getDate() + i);
+    const prev = new Date(view.week); prev.setDate(prev.getDate() - 7 + i);
+    dayKeys.push({ curKey: dayKey(cur), prevKey: dayKey(prev) });
+  }
+  commit(s => {
+    for (const { curKey, prevKey } of dayKeys) {
+      const prevDinner = (s.meals[prevKey]?.dinner || '').trim();
+      const curDinner  = (s.meals[curKey]?.dinner || '').trim();
+      if (prevDinner && !curDinner) {
+        (s.meals[curKey] = s.meals[curKey] || {}).dinner = prevDinner;
+        count++;
+      }
+    }
+  });
+  // Push the affected days. state is fresh after commit().
+  for (const { curKey } of dayKeys) {
+    if (state.meals[curKey]) sync.upsertMeal(curKey, state.meals[curKey]);
+  }
+  snack(count > 0 ? `Copied ${count} meal${count === 1 ? '' : 's'}` : 'Last week was empty');
+}
+
+/** Tap a meal chip → fill the first empty day in the current week. */
+function quickAddMeal(meal) {
+  if (!meal) return;
+  let filledKey = null;
+  commit(s => {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(view.week); d.setDate(d.getDate() + i);
+      const key = dayKey(d);
+      if (!(s.meals[key]?.dinner || '').trim()) {
+        (s.meals[key] = s.meals[key] || {}).dinner = meal;
+        filledKey = key;
+        return;
+      }
+    }
+  });
+  if (filledKey) {
+    sync.upsertMeal(filledKey, state.meals[filledKey]);
+    snack(`Added to ${new Date(filledKey + 'T00:00').toLocaleString('en-US', { weekday: 'short' })}`);
+  } else {
+    snack('No empty days this week');
+  }
+}
+
+/** Toggle the edit-modal overflow menu (currently houses Delete). */
+function toggleEditMenu() {
+  const m = $('editMenu');
+  if (m) m.hidden = !m.hidden;
 }
 /** Save dinner text WITHOUT re-rendering — the textarea is the live view of the data. */
 function saveDinner(textarea) {
@@ -1081,8 +1351,32 @@ const ACTIONS = {
   // Budget view reset
   resetPlan,
 
-  // Manual cloud refresh (tap the sync pill, or pull-to-refresh)
+  // Manual cloud refresh (refresh icon, or pull-to-refresh)
   refresh,
+
+  // Budget filter chips + jump-from-home tiles
+  setBudgetFilter:  (_, d) => { view.budgetFilter = d.filter; render(); },
+  goToGroup:        (_, d) => { view.budgetFilter = d.group;  setView('budget'); },
+
+  // Food: copy last week's dinners + tap a chip to fill the next empty day
+  copyLastWeek,
+  quickAddMeal:     (_, d) => quickAddMeal(d.meal),
+
+  // Settings: auto-save handled via data-on-change; invite + member actions here
+  copyInvite,
+  rotateInvite,
+  removeMember:     (_, d) => removeMember(d.user),
+
+  // Edit modal overflow menu
+  toggleEditMenu,
+
+  // Tap the sync pill — show last error if any
+  showSyncStatus:   () => snack(cloud.lastError ? `Sync error: ${cloud.lastError}` : 'Up to date'),
+};
+
+/** Inputs with data-on-change="autoSaveConfig" trigger this on blur. */
+const CHANGE_ACTIONS = {
+  autoSaveConfig: () => saveConfig(true),
 };
 
 const CONTEXT_ACTIONS = {
@@ -1105,6 +1399,15 @@ function delegate(eventName, attr, registry) {
 delegate('click',       'data-action',         ACTIONS);
 delegate('contextmenu', 'data-context-action', CONTEXT_ACTIONS);
 delegate('input',       'data-on-input',       INPUT_ACTIONS);
+delegate('change',      'data-on-change',      CHANGE_ACTIONS);
+
+// Close the edit-modal overflow menu on any outside click.
+document.addEventListener('click', e => {
+  const menu = $('editMenu');
+  if (!menu || menu.hidden) return;
+  if (e.target.closest('#editMenu') || e.target.closest('.overflow-btn')) return;
+  menu.hidden = true;
+});
 
 // Enter submits the shopping and transaction inputs.
 document.addEventListener('keydown', e => {

@@ -289,11 +289,13 @@
   .picker-cell .pc-icon{font-size:24px;margin-bottom:4px}
   .picker-cell .pc-name{font-size:11px;font-weight:600;line-height:1.2;color:var(--text-mid)}
 
-  /* Sync status pill in header */
+  /* Sync status pill in header — tappable to show last error */
   .sync-pill{font-size:10px;font-weight:700;padding:4px 9px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
   .sync-pill[data-kind="ok"]{background:rgba(62,224,143,.15);color:var(--green)}
   .sync-pill[data-kind="busy"]{background:rgba(243,202,90,.15);color:var(--amber)}
   .sync-pill[data-kind="err"]{background:rgba(238,90,90,.15);color:var(--red)}
+  button.sync-pill{appearance:none;border:0;font:inherit;letter-spacing:inherit;cursor:pointer;transition:transform .12s}
+  button.sync-pill:active{transform:scale(.95)}
 
   /* Food tab has its own week navigator — the month picker is noisy there. */
   body[data-screen="food"] .month-picker{display:none}
@@ -310,11 +312,10 @@
                   min-height:12px;line-height:1;letter-spacing:.01em}
   .sc-col.selected .sc-amt{color:var(--text)}
   .sc-col .sc-bar-wrap{flex:1;width:100%;min-height:0;
-                       display:flex;align-items:flex-end;justify-content:center}
-  .sc-col .sc-bar{width:100%;max-width:36px;
-                  background:linear-gradient(180deg,var(--green) 0%,var(--green-dim) 100%);
-                  border-radius:8px 8px 0 0;
-                  transition:opacity .15s}
+                       display:flex;align-items:flex-end;justify-content:center;gap:3px}
+  .sc-col .sc-bar{width:14px;border-radius:6px 6px 0 0;transition:opacity .15s}
+  .sc-col .sc-bar-budget{background:var(--card-hi);border:1px solid var(--line);box-sizing:border-box}
+  .sc-col .sc-bar-spent{background:linear-gradient(180deg,var(--green) 0%,var(--green-dim) 100%)}
   .sc-col:hover .sc-bar{opacity:.85}
   .sc-col .sc-lbl{font-size:11px;font-weight:600;color:var(--text-dim);
                   padding:3px 8px;border-radius:99px;transition:all .15s}
@@ -343,3 +344,97 @@
     from{transform:translate(-50%,12px) rotate(0)}
     to  {transform:translate(-50%,12px) rotate(360deg)}
   }
+
+  /* ── Home: cumulative-spend area chart hero ─────────────────────────── */
+  .hero-chart{padding:20px 20px 0;cursor:pointer;overflow:hidden}
+  .hc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+  .hc-label{font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:6px;letter-spacing:.01em}
+  .hc-amt{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em;color:var(--text)}
+  .hc-delta{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;line-height:1.25;max-width:150px;text-align:left}
+  .hc-delta.pos{color:var(--green)}
+  .hc-delta.neg{color:var(--amber)}
+  .hc-tick{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--green-bg);color:var(--green)}
+  .hc-delta.neg .hc-tick{background:var(--amber-bg);color:var(--amber)}
+  .hc-chart-wrap{margin:0 -20px -20px;padding:0}
+  .hc-svg{display:block;width:100%;height:96px}
+
+  /* ── Home: collapsed category-group rows ────────────────────────────── */
+  .cat-group-row{appearance:none;border:0;background:transparent;cursor:pointer;
+                 display:block;width:100%;padding:14px 16px;text-align:left;color:var(--text);
+                 transition:background .1s}
+  .cat-group-row + .cat-group-row{border-top:1px solid var(--line-soft)}
+  .cat-group-row:hover{background:var(--card-hi)}
+  .cgr-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+  .cgr-name{font-size:14px;font-weight:600;color:var(--text)}
+  .cgr-amts{font-size:13px;font-weight:600;white-space:nowrap}
+  .cgr-spent{color:var(--text)}
+  .cgr-budget{color:var(--text-dim);margin-left:2px}
+  .cgr-bar{height:6px;border-radius:99px;overflow:hidden;background:var(--line-soft);display:flex;gap:1px}
+  .cgr-seg{height:100%;flex-shrink:0}
+  .cgr-seg.red{background:var(--red)} .cgr-seg.amber{background:var(--amber)}
+  .cgr-seg.green{background:var(--green)} .cgr-seg.blue{background:var(--blue)}
+  .cgr-seg.purple{background:var(--purple)} .cgr-seg.grey{background:var(--text-dim)}
+  .cgr-empty{font-size:12px;color:var(--text-dim);padding:2px 0}
+
+  /* ── Budget: filter chips ───────────────────────────────────────────── */
+  .filter-chips{display:flex;gap:8px;overflow-x:auto;padding:0 2px 4px;margin:8px 0 0;
+                scrollbar-width:none}
+  .filter-chips::-webkit-scrollbar{display:none}
+  .filter-chips .chip{appearance:none;border:1px solid var(--line);background:var(--card);
+                      color:var(--text-mid);font:inherit;font-size:12px;font-weight:600;
+                      padding:7px 14px;border-radius:99px;cursor:pointer;white-space:nowrap;
+                      transition:all .12s}
+  .filter-chips .chip:hover{background:var(--card-hi);color:var(--text)}
+  .filter-chips .chip.active{background:var(--green);color:#06281a;border-color:var(--green)}
+
+  /* ── Food: top-meals chips above dinner planner ─────────────────────── */
+  .meal-chips{display:flex;gap:6px;overflow-x:auto;padding:0 2px 6px;margin:8px 0 0;
+              scrollbar-width:none}
+  .meal-chips:empty{display:none}
+  .meal-chips::-webkit-scrollbar{display:none}
+  .meal-chip{appearance:none;border:1px solid var(--line-soft);background:var(--card);
+             color:var(--text-mid);font:inherit;font-size:12px;font-weight:600;
+             padding:6px 12px;border-radius:99px;cursor:pointer;white-space:nowrap;max-width:160px;
+             overflow:hidden;text-overflow:ellipsis;transition:all .12s}
+  .meal-chip:hover{background:var(--card-hi);color:var(--text)}
+
+  /* ── Food: shopping-list budget line in section header ──────────────── */
+  .shop-budget-line{margin:-6px 4px 8px;font-size:12px;color:var(--text-dim);font-weight:500}
+  .shop-budget-line:empty{display:none}
+
+  /* ── Generic mini button (used by Copy last week, Copy code, Rotate) ── */
+  .btn-mini{appearance:none;border:1px solid var(--line);background:var(--card);
+            color:var(--text-mid);font:inherit;font-size:11px;font-weight:600;
+            padding:5px 10px;border-radius:99px;cursor:pointer;transition:all .12s}
+  .btn-mini:hover{background:var(--card-hi);color:var(--text)}
+  .btn-mini:active{transform:scale(.95)}
+  .btn-mini.danger{color:var(--red);border-color:var(--red-bg)}
+  .btn-mini.danger:hover{background:var(--red-bg)}
+  /* Inline copy/rotate buttons should sit cleanly next to the code text */
+  .invite-row .invite-actions{display:flex;align-items:center;gap:8px}
+
+  /* ── Settings: members list ─────────────────────────────────────────── */
+  .member-row{display:flex;align-items:center;gap:10px;padding:12px 14px;
+              border-bottom:1px solid var(--line-soft)}
+  .member-row:last-child{border-bottom:0}
+  .member-info{flex:1;min-width:0}
+  .member-email{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .member-joined{font-size:11px;color:var(--text-dim);margin-top:2px}
+
+  /* ── Edit modal: head + overflow menu ───────────────────────────────── */
+  .edit-head{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .edit-head h2{margin:8px 0 6px}
+  .edit-head .sub{margin-bottom:0}
+  .overflow-btn{appearance:none;background:transparent;border:0;color:var(--text-mid);
+                font-size:24px;font-weight:700;line-height:1;cursor:pointer;
+                padding:8px 12px;border-radius:8px;flex-shrink:0;margin-top:4px}
+  .overflow-btn:hover{background:var(--card-hi);color:var(--text)}
+  .overflow-menu{position:absolute;top:46px;right:0;z-index:5;
+                 background:var(--card);border:1px solid var(--line);border-radius:12px;
+                 padding:6px;min-width:200px;box-shadow:var(--shadow)}
+  .om-item{display:block;width:100%;padding:10px 12px;background:transparent;border:0;
+           color:var(--text);font:inherit;font-size:14px;font-weight:600;text-align:left;
+           cursor:pointer;border-radius:8px}
+  .om-item:hover{background:var(--card-hi)}
+  .om-item.danger{color:var(--red)}
+  .om-item.danger:hover{background:var(--red-bg)}

@@ -141,6 +141,24 @@ const auth = {
     if (error) throw error;
     cloud.inviteCode = data.invite_code;
   },
+
+  async rotateInviteCode() {
+    const { data, error } = await sb.rpc('rotate_invite_code');
+    if (error) throw error;
+    cloud.inviteCode = data;
+    return data;
+  },
+
+  async listMembers() {
+    const { data, error } = await sb.rpc('list_household_members');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async removeMember(userId) {
+    const { error } = await sb.rpc('remove_household_member', { target: userId });
+    if (error) throw error;
+  },
 };
 
 /* ── Hydration: pull the whole household's state from Supabase ──────────── */
