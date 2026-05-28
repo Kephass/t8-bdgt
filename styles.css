@@ -142,6 +142,13 @@
   .modal.open{display:flex}
   .sheet{width:100%;max-width:540px;background:var(--bg-soft);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;overscroll-behavior:contain;animation:slideUp .3s ease;will-change:transform}
   @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes slideDown{from{transform:translateY(0)}to{transform:translateY(100%)}}
+  @keyframes fadeOut{from{opacity:1}to{opacity:0}}
+  /* Closing animation — backdrop fades, sheet slides down. Mirror the
+     opening duration/easing (slideUp is .3s ease, line above) so close
+     feels balanced with open. CLOSE_MS in app.js must match this duration. */
+  .modal.closing{animation:fadeOut .3s ease forwards;pointer-events:none}
+  .modal.closing .sheet{animation:slideDown .3s ease forwards}
   .sheet h2{margin:8px 0 6px;font-size:22px;font-weight:700;letter-spacing:-.01em}
   .sheet .sub{font-size:14px;color:var(--text-mid);margin-bottom:18px;line-height:1.45}
   .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px}

@@ -460,7 +460,18 @@ function editingCategory() {
    take normal arguments, not DOM events. */
 
 const openModal  = id => $(id).classList.add('open');
-const closeModal = id => $(id).classList.remove('open');
+/** Close a modal with a slide-down + fade-out animation. The .closing
+   class drives the keyframe (see styles.css); after the duration we
+   remove both classes so the modal goes back to display:none.
+   Keep CLOSE_MS in sync with the CSS animation duration. */
+const CLOSE_MS = 300;   // matches the CSS .modal.closing animation duration
+const closeModal = id => {
+  const el = $(id);
+  if (!el || !el.classList.contains('open')) return;
+  if (el.classList.contains('closing'))      return;   // already animating out
+  el.classList.add('closing');
+  setTimeout(() => el.classList.remove('open', 'closing'), CLOSE_MS);
+};
 
 /* -- Screen navigation ---------------------------------------------------- */
 
