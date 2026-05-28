@@ -349,7 +349,7 @@
   /* margins mirror the old .hero so the card sits inside the page gutter
      and isn't flush against the .row3 tiles below. */
   .hero-chart{margin:8px 16px 16px;padding:20px 20px 0;cursor:pointer;overflow:hidden}
-  .hc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+  .hc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:6px}
   .hc-label{font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:6px;letter-spacing:.01em}
   .hc-amt{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em;color:var(--text)}
   .hc-delta{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;line-height:1.25;max-width:150px;text-align:left}
@@ -357,8 +357,16 @@
   .hc-delta.neg{color:var(--amber)}
   .hc-tick{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--green-bg);color:var(--green)}
   .hc-delta.neg .hc-tick{background:var(--amber-bg);color:var(--amber)}
-  .hc-chart-wrap{margin:0 -20px -20px;padding:0}
-  .hc-svg{display:block;width:100%;height:96px}
+  .hc-chart-wrap{margin:0 -20px}
+  .hc-svg{display:block;width:100%;height:110px}
+  /* Footer divider + View spending row — mirrors Rocket Money's pattern */
+  .hc-footer{display:flex;align-items:center;gap:10px;
+             margin:0 -20px;padding:14px 20px;
+             border-top:1px solid var(--line-soft);
+             color:var(--text);font-weight:600;font-size:14px}
+  .hc-foot-icon{display:inline-flex;color:var(--text-mid)}
+  .hc-foot-text{flex:1}
+  .hc-foot-chev{color:var(--text-dim);font-size:22px;line-height:1}
 
   /* ── Home: collapsed category-group rows ────────────────────────────── */
   .cat-group-row{appearance:none;border:0;background:transparent;cursor:pointer;

@@ -292,14 +292,31 @@ function renderHomeHeroChart() {
   }
 
   // SVG path — viewBox is fixed (W×H), CSS stretches it via preserveAspectRatio="none"
-  const W = 320, H = 96;
+  const W = 320, H = 110;
   const max = Math.max(1, cum[cutoffDay] || 1);
   const xFor = day => daysInMonth > 1 ? ((day - 1) / (daysInMonth - 1)) * W : W / 2;
-  const yFor = val => H - (val / max) * (H - 6) - 3;
+  const yFor = val => H - (val / max) * (H - 8) - 4;
   const points = [];
   for (let i = 1; i <= cutoffDay; i++) points.push([xFor(i), yFor(cum[i])]);
   if (points.length === 1) points.unshift([0, yFor(0)]);  // need 2 points for a visible stroke
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+
+  // Cardinal-spline smoothing — each segment is a cubic Bezier whose control
+  // points are derived from the neighbouring data points. Matches the soft
+  // curve in modern budgeting apps (Rocket Money etc.) and visually hides
+  // the rent-on-day-1 step you'd otherwise see as a vertical matchstick.
+  const tension = 0.22;
+  let line = `M${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || points[i + 1];
+    const c1x = p1[0] + (p2[0] - p0[0]) * tension;
+    const c1y = p1[1] + (p2[1] - p0[1]) * tension;
+    const c2x = p2[0] - (p3[0] - p1[0]) * tension;
+    const c2y = p2[1] - (p3[1] - p1[1]) * tension;
+    line += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
   const lastX = points[points.length - 1][0];
   const area = `${line} L${lastX.toFixed(1)} ${H} L${points[0][0].toFixed(1)} ${H} Z`;
   const dotX = lastX.toFixed(1);
@@ -319,7 +336,7 @@ function renderHomeHeroChart() {
       <svg class="hc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <defs>
           <linearGradient id="hcGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--green)" stop-opacity=".35"/>
+            <stop offset="0%" stop-color="var(--green)" stop-opacity=".4"/>
             <stop offset="100%" stop-color="var(--green)" stop-opacity="0"/>
           </linearGradient>
         </defs>
@@ -328,6 +345,15 @@ function renderHomeHeroChart() {
         <circle cx="${dotX}" cy="${dotY}" r="5" fill="var(--green)"/>
         <circle cx="${dotX}" cy="${dotY}" r="2.5" fill="var(--bg)"/>
       </svg>
+    </div>
+    <div class="hc-footer">
+      <span class="hc-foot-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>
+        </svg>
+      </span>
+      <span class="hc-foot-text">View spending</span>
+      <span class="hc-foot-chev" aria-hidden="true">›</span>
     </div>
   `;
 }
