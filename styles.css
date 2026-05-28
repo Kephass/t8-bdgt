@@ -371,6 +371,21 @@
   .hc-foot-text{flex:1}
   .hc-foot-chev{color:var(--text-dim);font-size:22px;line-height:1}
 
+  /* ── Dashboard: snapshot tiles row (Bills & utilities + Savings) ────── */
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 16px}
+  .tile-card{appearance:none;border:0;background:var(--card);
+             border-radius:var(--radius);padding:14px 14px 12px;
+             color:var(--text);text-align:left;cursor:pointer;
+             display:flex;flex-direction:column;gap:7px;
+             transition:transform .12s,background .12s}
+  .tile-card:hover{background:var(--card-hi)}
+  .tile-card:active{transform:scale(.97)}
+  .tc-label{font-size:11px;font-weight:600;color:var(--text-mid);letter-spacing:.04em;text-transform:uppercase}
+  .tc-amt{font-size:18px;font-weight:700;line-height:1.1;color:var(--text);letter-spacing:-.01em}
+  .tc-bar{height:4px;background:var(--line-soft);border-radius:99px;overflow:hidden;margin-top:2px}
+  .tc-bar-fill{height:100%;background:var(--green);transition:width .25s}
+  .tc-sub{font-size:11px;color:var(--text-dim);font-weight:500}
+
   /* ── Home: collapsed category-group rows ────────────────────────────── */
   .cat-group-row{appearance:none;border:0;background:transparent;cursor:pointer;
                  display:block;width:100%;padding:14px 16px;text-align:left;color:var(--text);

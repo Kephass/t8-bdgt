@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
@@ -242,6 +242,22 @@
       <div class="card" id="categoryGroups"></div>
     </div>
 
+    <!-- Snapshot tiles: bills-left-to-pay + savings target. -->
+    <div class="row2">
+      <button class="tile-card" data-action="goToGroup" data-group="fixed" aria-label="Bills and utilities — go to fixed budget">
+        <div class="tc-label">Bills &amp; utilities</div>
+        <div class="tc-amt num" id="billsLeft">€0 left</div>
+        <div class="tc-bar"><div class="tc-bar-fill" id="billsBarFill" style="width:0%"></div></div>
+        <div class="tc-sub" id="billsSub">€0 paid</div>
+      </button>
+      <button class="tile-card" data-action="setView" data-view="setup" aria-label="Savings target — edit in settings">
+        <div class="tc-label">Savings</div>
+        <div class="tc-amt num" id="savingsAmt">€0 / mo</div>
+        <div class="tc-bar"><div class="tc-bar-fill" style="width:100%"></div></div>
+        <div class="tc-sub" id="savingsSub">€0 / yr if kept</div>
+      </button>
+    </div>
+
     <div class="btn-row">
       <button class="btn ghost btn-block" data-action="openOnboard" data-replan="true">Re-plan month</button>
       <button class="btn primary btn-block" data-action="openAdd">+ Add</button>
@@ -390,7 +406,7 @@
 <nav class="bottom">
   <button class="item active" data-view="home" data-action="setView">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 4l9 8"/><path d="M5 10v10h14V10"/></svg>
-    Home
+    Dashboard
   </button>
   <button class="item" data-view="budget" data-action="setView">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
@@ -441,6 +457,6 @@
 <script src="cloud.js?v=4"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=1"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

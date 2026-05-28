@@ -248,6 +248,30 @@ function renderHome() {
 
   $('categoryGroups').innerHTML =
     ['fixed','essentials','discretionary'].map(categoryGroupSummary).join('');
+
+  renderSnapshotTiles();
+}
+
+/** Two side-by-side tiles below the categories card:
+   1. Bills & utilities — how much of this month's fixed bills are still owed
+      (fixed budgets minus what's already been logged), with a progress bar.
+   2. Savings — the monthly target + an annualised "if kept" projection.
+   The savings actuals aren't tracked yet so the bar is informational only. */
+function renderSnapshotTiles() {
+  const fixed = state.categories.filter(c => c.group === 'fixed');
+  const fixedBudget = fixed.reduce((t, c) => t + derive.budget(c), 0);
+  const fixedSpent  = fixed.reduce((t, c) => t + derive.spent(c.id), 0);
+  const fixedLeft   = Math.max(0, fixedBudget - fixedSpent);
+  const billsPct    = fixedBudget > 0 ? Math.min(100, (fixedSpent / fixedBudget) * 100) : 0;
+  $('billsLeft').textContent      = `${fmt(fixedLeft)} left`;
+  $('billsSub').textContent       = `${fmt(fixedSpent)} of ${fmt(fixedBudget)} paid`;
+  $('billsBarFill').style.width   = `${billsPct.toFixed(1)}%`;
+
+  const savings = +state.config.savings || 0;
+  $('savingsAmt').textContent = `${fmt(savings)} / mo`;
+  $('savingsSub').textContent = savings > 0
+    ? `${fmt(savings * 12)} / yr if kept`
+    : 'Set a target in Settings';
 }
 
 /** Cumulative-spend area chart for view.month. Shows the running total
