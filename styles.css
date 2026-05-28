@@ -137,6 +137,23 @@
   .help{font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.45}
   select.input{background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='%23a3acbf' width='12' height='8' viewBox='0 0 12 8'%3e%3cpath d='M1 1l5 5 5-5'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
 
+  /* Launch splash — covers the page until boot() resolves the session, then
+     fades out. Sits above modals (z-index > .modal's 100) so the auth modal
+     can be opened underneath it before the fade begins, avoiding the brief
+     auth-modal flash users saw on cached loads.
+
+     Background is a bold diagonal in the app's green accent (Rocket-Money
+     style full-bleed brand wash), with a soft hotspot behind the wordmark
+     to give the gradient depth without washing out the mark+text. */
+  .splash{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:radial-gradient(60% 45% at 50% 48%,rgba(255,255,255,.10),transparent 70%),linear-gradient(140deg,#07251a 0%,#0e4a30 28%,#197a51 58%,#2bb377 88%,#3ee08f 100%);opacity:1;transition:opacity .45s ease;-webkit-tap-highlight-color:transparent}
+  .splash.hidden{opacity:0;pointer-events:none}
+  .splash-brand{display:flex;flex-direction:column;align-items:center;gap:16px;transform:translateY(-8px)}
+  /* Dark chip so the green icon pops against the green gradient — mirrors the
+     contrast move Rocket Money makes with its logo lockup on a saturated bg. */
+  .splash-mark{width:74px;height:74px;border-radius:22px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(10,13,20,.92),rgba(10,13,20,.78));border:1px solid rgba(255,255,255,.10);color:var(--green);box-shadow:0 24px 60px rgba(0,0,0,.40),0 1px 0 rgba(255,255,255,.06) inset}
+  .splash-wordmark{font-size:18px;font-weight:700;letter-spacing:.02em;color:#fff;text-shadow:0 1px 16px rgba(0,0,0,.25)}
+  @media (prefers-reduced-motion: reduce){.splash{transition-duration:.001s}}
+
   /* Onboarding (modal) */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:100;display:none;align-items:flex-end;justify-content:center}
   .modal.open{display:flex}

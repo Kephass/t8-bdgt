@@ -1576,12 +1576,43 @@ document.addEventListener('touchend', () => {
 (async function boot() {
   // Reflect the initial active view on <body> (the HTML defaults to home).
   document.body.dataset.screen = 'home';
-  runMigrations();
-  render();   // render blank UI behind the auth modal so the page isn't empty
-  await auth.getSession();
-  if (cloud.session) {
-    await onAuthed();
-  } else {
-    showAuthModal('signin');
+
+  // Launch splash: covers the page until auth state is resolved. We measure
+  // start time so we can enforce a minimum visible duration on cached/instant
+  // session resolves — otherwise the splash would flash by too quickly to
+  // register as a deliberate opening screen.
+  const splash = document.getElementById('splash');
+  const splashStart = performance.now();
+  const MIN_SPLASH_MS = 550;        // floor so the splash always feels intentional
+  const FADE_MS = 450;              // must match `.splash` transition in styles.css
+
+  function hideSplash() {
+    if (!splash) return;
+    const wait = Math.max(0, MIN_SPLASH_MS - (performance.now() - splashStart));
+    setTimeout(() => {
+      splash.classList.add('hidden');
+      // Remove from the DOM once the fade completes so it can't intercept
+      // taps or get re-shown by stale references.
+      setTimeout(() => splash.remove(), FADE_MS + 50);
+    }, wait);
+  }
+
+  try {
+    runMigrations();
+    render();   // render blank UI behind the auth modal so the page isn't empty
+    await auth.getSession();
+    if (cloud.session) {
+      // Authenticated: hydrate and let the splash fade straight to the app.
+      await onAuthed();
+    } else {
+      // No session: open the auth modal *under* the splash so it's already
+      // in place when the splash fades, instead of popping in afterwards.
+      showAuthModal('signin');
+    }
+  } finally {
+    // Always release the splash — even if boot threw, the user should see
+    // something interactive (modal or partially-rendered app) rather than a
+    // permanently stuck opening screen.
+    hideSplash();
   }
 })();

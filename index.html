@@ -4,18 +4,36 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
-<title>Family Budget</title>
+<title>T8 Budget</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=9">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
-<!-- AUTH SHEET — shown when there is no Supabase session. Gates the app. -->
-<div class="modal open" id="authModal" style="z-index:90">
+<!-- LAUNCH SPLASH — covers the page on first paint, fades out once boot() has
+     decided whether to show the app or the auth modal. Inline so it paints
+     before stylesheets settle and before any JS runs. Removed from the DOM
+     after the transition so it never re-intercepts pointer events. -->
+<div id="splash" class="splash" role="presentation" aria-hidden="true">
+  <div class="splash-brand">
+    <div class="splash-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34" aria-hidden="true">
+        <path d="M3 3v18h18"/>
+        <path d="M7 14l4-4 4 3 5-6"/>
+      </svg>
+    </div>
+    <div class="splash-wordmark">T8 Budget</div>
+  </div>
+</div>
+
+<!-- AUTH SHEET — shown when there is no Supabase session. Gates the app.
+     Not `open` on first paint: the launch splash covers the page until boot()
+     resolves the session, then either reveals the app or opens this modal. -->
+<div class="modal" id="authModal" style="z-index:90">
   <div class="sheet">
     <div class="grab"></div>
     <h2 id="authTitle">Sign in</h2>
@@ -60,18 +78,12 @@
     <p class="sub" id="onboardSub">Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.</p>
 
     <label class="label">Monthly income</label>
-    <input class="input num-input" id="incomeInput" type="text" inputmode="decimal" placeholder="3209" />
-    <p class="help">Felix + Valeria + any benefits coming into the joint account.</p>
+    <input class="input num-input" id="incomeInput" type="text" inputmode="decimal" placeholder="1234" />
+    <p class="help">Felix + Sadi + any benefits coming into the joint account.</p>
 
     <label class="label">How much do you want to save?</label>
-    <input class="input num-input" id="saveInput" type="text" inputmode="decimal" placeholder="100" />
+    <input class="input num-input" id="saveInput" type="text" inputmode="decimal" placeholder="123" />
     <p class="help">This is taken off the top, before allocating to discretionary spending.</p>
-
-    <label class="label">Cofidis loan active?</label>
-    <div class="setup-row" style="padding:14px 0;border:none">
-      <span class="label-inline">€160/mo loan, ends Jun 2026</span>
-      <div class="toggle on" id="cofidisToggle" data-action="toggleCofidis"></div>
-    </div>
 
     <div class="btn-row" style="margin:18px 0 0">
       <button class="btn ghost btn-block" data-action="closeOnboard">Cancel</button>
@@ -395,8 +407,8 @@
     </div>
 
     <div style="text-align:center;color:var(--text-dim);font-size:11px;margin:30px 0 18px;line-height:1.5">
-      Family Budget · synced across your household<br>
-      Built for the Oduro Fosu – Dos Santos Lima household.
+      T8 Budget · synced across your household.<br>
+      Built by Oduro Fosu.
     </div>
   </section>
 
@@ -457,6 +469,6 @@
 <script src="cloud.js?v=4"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=1"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>
