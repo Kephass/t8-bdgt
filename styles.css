@@ -144,7 +144,7 @@
   @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
   .sheet h2{margin:8px 0 6px;font-size:22px;font-weight:700;letter-spacing:-.01em}
   .sheet .sub{font-size:14px;color:var(--text-mid);margin-bottom:18px;line-height:1.45}
-  .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px;touch-action:none;cursor:grab}
+  .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px}
 
   /* Tabs (top within food page) */
   .tabs{display:flex;gap:6px;padding:4px;background:var(--card);border-radius:12px;margin:0 16px}
