@@ -289,12 +289,15 @@
   .picker-cell .pc-icon{font-size:24px;margin-bottom:4px}
   .picker-cell .pc-name{font-size:11px;font-weight:600;line-height:1.2;color:var(--text-mid)}
 
-  /* Sync status pill in header — tappable to show last error */
-  .sync-pill{font-size:10px;font-weight:700;padding:4px 9px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+  /* Sync status pill in header — tappable to show last error.
+     Smaller + sentence-cased so "Synced 12m ago" reads naturally.
+     NOTE: do NOT use `font: inherit` on the button form — the shorthand
+     resets font-size and font-weight, defeating the size below. */
+  .sync-pill{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;letter-spacing:.01em;line-height:1.35}
   .sync-pill[data-kind="ok"]{background:rgba(62,224,143,.15);color:var(--green)}
   .sync-pill[data-kind="busy"]{background:rgba(243,202,90,.15);color:var(--amber)}
   .sync-pill[data-kind="err"]{background:rgba(238,90,90,.15);color:var(--red)}
-  button.sync-pill{appearance:none;border:0;font:inherit;letter-spacing:inherit;cursor:pointer;transition:transform .12s}
+  button.sync-pill{appearance:none;border:0;font-family:inherit;cursor:pointer;transition:transform .12s}
   button.sync-pill:active{transform:scale(.95)}
 
   /* Food tab has its own week navigator — the month picker is noisy there. */

@@ -39,19 +39,38 @@ const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_PUB
 /* ── Cloud state — household id is captured once on sign-in ─────────────── */
 
 const cloud = {
-  session:     null,
-  householdId: null,
-  inviteCode:  null,
-  pending:     0,         // in-flight sync ops, drives the indicator
-  lastError:   null,
+  session:       null,
+  householdId:   null,
+  inviteCode:    null,
+  pending:       0,         // in-flight sync ops, drives the indicator
+  lastError:     null,
+  lastSyncedAt:  null,      // ms timestamp of the most recent successful sync
 };
+
+function syncedAgeLabel() {
+  if (!cloud.lastSyncedAt) return 'Synced';
+  const seconds = Math.floor((Date.now() - cloud.lastSyncedAt) / 1000);
+  if (seconds < 60)            return 'Synced';
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60)               return `Synced ${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24)              return `Synced ${hours}h ago`;
+  return 'Synced 1d+ ago';
+}
 
 function setStatus(text, kind = 'ok') {
   const el = document.getElementById('syncStatus');
   if (!el) return;
-  el.textContent = text;
   el.dataset.kind = kind;
+  el.textContent  = (kind === 'ok') ? syncedAgeLabel() : text;
 }
+
+// Tick the displayed age once a minute so "Synced" rolls into "Synced 1m"
+// without waiting for the next sync.
+setInterval(() => {
+  const el = document.getElementById('syncStatus');
+  if (el && el.dataset.kind === 'ok') el.textContent = syncedAgeLabel();
+}, 60000);
 
 function note(op, err) {
   if (!err) return;
@@ -71,7 +90,10 @@ async function track(op, fn) {
     return null;
   } finally {
     cloud.pending--;
-    if (cloud.pending === 0 && !cloud.lastError) setStatus('Synced', 'ok');
+    if (cloud.pending === 0 && !cloud.lastError) {
+      cloud.lastSyncedAt = Date.now();
+      setStatus('Synced', 'ok');
+    }
   }
 }
 
@@ -223,6 +245,7 @@ async function hydrate() {
 
   save();   // mirror to localStorage
   render();
+  cloud.lastSyncedAt = Date.now();
   setStatus('Synced', 'ok');
 }
 
