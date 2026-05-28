@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
@@ -250,11 +250,11 @@
         <div class="tc-bar"><div class="tc-bar-fill" id="billsBarFill" style="width:0%"></div></div>
         <div class="tc-sub" id="billsSub">€0 paid</div>
       </button>
-      <button class="tile-card" data-action="setView" data-view="setup" aria-label="Savings target — edit in settings">
-        <div class="tc-label">Savings</div>
-        <div class="tc-amt num" id="savingsAmt">€0 / mo</div>
-        <div class="tc-bar"><div class="tc-bar-fill" style="width:100%"></div></div>
-        <div class="tc-sub" id="savingsSub">€0 / yr if kept</div>
+      <button class="tile-card" data-action="setView" data-view="setup" aria-label="Surplus — adjust in settings">
+        <div class="tc-label">Surplus</div>
+        <div class="tc-amt num" id="surplusAmt">€0</div>
+        <div class="tc-bar"><div class="tc-bar-fill" id="surplusBarFill" style="width:0%"></div></div>
+        <div class="tc-sub" id="surplusSub">Income − budgets − savings</div>
       </button>
     </div>
 
@@ -457,6 +457,6 @@
 <script src="cloud.js?v=4"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=1"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

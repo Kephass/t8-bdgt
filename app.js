@@ -267,11 +267,29 @@ function renderSnapshotTiles() {
   $('billsSub').textContent       = `${fmt(fixedSpent)} of ${fmt(fixedBudget)} paid`;
   $('billsBarFill').style.width   = `${billsPct.toFixed(1)}%`;
 
-  const savings = +state.config.savings || 0;
-  $('savingsAmt').textContent = `${fmt(savings)} / mo`;
-  $('savingsSub').textContent = savings > 0
-    ? `${fmt(savings * 12)} / yr if kept`
-    : 'Set a target in Settings';
+  // Surplus = income − total budgeted − monthly savings target. The same
+  // "slack / over-spend" line the old Summary card showed: positive means
+  // you'd finish the month with money left if you stuck to budgets.
+  const income   = +state.config.income  || 0;
+  const savings  = +state.config.savings || 0;
+  const totals   = derive.totals();
+  const surplus  = income - totals.budgeted - savings;
+  const surplusAmtEl = $('surplusAmt');
+  const surplusBarEl = $('surplusBarFill');
+  surplusAmtEl.textContent = fmt(surplus);
+  surplusAmtEl.classList.toggle('over', surplus < 0);
+  surplusBarEl.classList.toggle('over', surplus < 0);
+  // Bar: when positive, fill proportional to share of income. When negative,
+  // show a thin red sliver so the alert is visible without overwhelming.
+  const barPct = income > 0
+    ? (surplus >= 0
+        ? Math.min(100, (surplus / income) * 100)
+        : Math.min(100, (-surplus / income) * 100))
+    : 0;
+  surplusBarEl.style.width = `${barPct.toFixed(1)}%`;
+  $('surplusSub').textContent = surplus >= 0
+    ? `${fmt(income)} − ${fmt(totals.budgeted)} − ${fmt(savings)}`
+    : `${fmt(-surplus)} over income`;
 }
 
 /** Cumulative-spend area chart for view.month. Shows the running total

@@ -383,7 +383,9 @@
   .tc-label{font-size:11px;font-weight:600;color:var(--text-mid);letter-spacing:.04em;text-transform:uppercase}
   .tc-amt{font-size:18px;font-weight:700;line-height:1.1;color:var(--text);letter-spacing:-.01em}
   .tc-bar{height:4px;background:var(--line-soft);border-radius:99px;overflow:hidden;margin-top:2px}
-  .tc-bar-fill{height:100%;background:var(--green);transition:width .25s}
+  .tc-bar-fill{height:100%;background:var(--green);transition:width .25s,background .15s}
+  .tc-bar-fill.over{background:var(--red)}
+  .tc-amt.over{color:var(--red)}
   .tc-sub{font-size:11px;color:var(--text-dim);font-weight:500}
 
   /* ── Home: collapsed category-group rows ────────────────────────────── */
