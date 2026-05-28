@@ -1088,12 +1088,13 @@ document.addEventListener('click', e => {
 });
 window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, true);
 
-/* ── Swipe-down to dismiss modal sheets ─────────────────────────────────
-   Mirrors iOS sheet behaviour: drag from the grab handle, or from the
-   sheet body when its content is scrolled to the top. Past ~25% of the
-   sheet height (capped at 120px) it commits the close. Below that, it
-   snaps back. The auth modal isn't in MODAL_CLOSERS, so it stays
-   non-dismissable. */
+/* ── Tap outside the sheet to dismiss the modal ─────────────────────────
+   Each entry in MODAL_CLOSERS maps a modal id to its close action.
+   authModal is intentionally absent — it's the sign-in gate, you
+   sign in to dismiss it. The click only fires when the target IS the
+   backdrop (i.e. the .modal element itself); taps inside the sheet
+   bubble through the sheet first and never reach this listener as
+   target === the modal. */
 const MODAL_CLOSERS = {
   editModal:   closeEdit,
   addModal:    closeAdd,
@@ -1101,42 +1102,13 @@ const MODAL_CLOSERS = {
   quickLog:    closeQuickLog,
   monthPicker: closeMonthPicker,
 };
-let sheetDrag = null;
-document.addEventListener('touchstart', e => {
-  if (sheetDrag) return;
-  const sheet = e.target.closest?.('.modal.open .sheet');
-  if (!sheet) return;
-  const closer = MODAL_CLOSERS[sheet.parentElement.id];
-  if (!closer) return;
-  const onGrab = !!e.target.closest('.grab');
-  if (!onGrab && sheet.scrollTop > 0) return;   // let content scroll instead
-  sheetDrag = { sheet, closer, startY: e.touches[0].clientY, dy: 0, height: sheet.offsetHeight };
-}, { passive: true });
-document.addEventListener('touchmove', e => {
-  if (!sheetDrag) return;
-  const raw = e.touches[0].clientY - sheetDrag.startY;
-  // Allow a small upward bounce (-12px) for tactile feel; clamp the rest down.
-  sheetDrag.dy = Math.max(-12, raw);
-  sheetDrag.sheet.style.transform = `translateY(${sheetDrag.dy}px)`;
-}, { passive: true });
-document.addEventListener('touchend', () => {
-  if (!sheetDrag) return;
-  const { sheet, closer, dy, height } = sheetDrag;
-  sheetDrag = null;
-  const threshold = Math.min(120, height * 0.25);
-  sheet.style.transition = 'transform .22s ease';
-  if (dy >= threshold) {
-    sheet.style.transform = `translateY(${height}px)`;
-    setTimeout(() => {
-      sheet.style.transform = '';
-      sheet.style.transition = '';
-      closer();
-    }, 230);
-  } else {
-    sheet.style.transform = '';
-    setTimeout(() => { sheet.style.transition = ''; }, 230);
-  }
-}, { passive: true });
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  if (!t.classList.contains('modal') || !t.classList.contains('open')) return;
+  const closer = MODAL_CLOSERS[t.id];
+  if (closer) closer();
+});
 
 /* ── Pull-to-refresh ─────────────────────────────────────────────────────
    Only kicks in at the very top of the page, outside any modal, while
