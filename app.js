@@ -1088,6 +1088,56 @@ document.addEventListener('click', e => {
 });
 window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, true);
 
+/* ── Swipe-down to dismiss modal sheets ─────────────────────────────────
+   Mirrors iOS sheet behaviour: drag from the grab handle, or from the
+   sheet body when its content is scrolled to the top. Past ~25% of the
+   sheet height (capped at 120px) it commits the close. Below that, it
+   snaps back. The auth modal isn't in MODAL_CLOSERS, so it stays
+   non-dismissable. */
+const MODAL_CLOSERS = {
+  editModal:   closeEdit,
+  addModal:    closeAdd,
+  onboard:     closeOnboard,
+  quickLog:    closeQuickLog,
+  monthPicker: closeMonthPicker,
+};
+let sheetDrag = null;
+document.addEventListener('touchstart', e => {
+  if (sheetDrag) return;
+  const sheet = e.target.closest?.('.modal.open .sheet');
+  if (!sheet) return;
+  const closer = MODAL_CLOSERS[sheet.parentElement.id];
+  if (!closer) return;
+  const onGrab = !!e.target.closest('.grab');
+  if (!onGrab && sheet.scrollTop > 0) return;   // let content scroll instead
+  sheetDrag = { sheet, closer, startY: e.touches[0].clientY, dy: 0, height: sheet.offsetHeight };
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (!sheetDrag) return;
+  const raw = e.touches[0].clientY - sheetDrag.startY;
+  // Allow a small upward bounce (-12px) for tactile feel; clamp the rest down.
+  sheetDrag.dy = Math.max(-12, raw);
+  sheetDrag.sheet.style.transform = `translateY(${sheetDrag.dy}px)`;
+}, { passive: true });
+document.addEventListener('touchend', () => {
+  if (!sheetDrag) return;
+  const { sheet, closer, dy, height } = sheetDrag;
+  sheetDrag = null;
+  const threshold = Math.min(120, height * 0.25);
+  sheet.style.transition = 'transform .22s ease';
+  if (dy >= threshold) {
+    sheet.style.transform = `translateY(${height}px)`;
+    setTimeout(() => {
+      sheet.style.transform = '';
+      sheet.style.transition = '';
+      closer();
+    }, 230);
+  } else {
+    sheet.style.transform = '';
+    setTimeout(() => { sheet.style.transition = ''; }, 230);
+  }
+}, { passive: true });
+
 /* ── Pull-to-refresh ─────────────────────────────────────────────────────
    Only kicks in at the very top of the page, outside any modal, while
    signed in and not already syncing. Past the threshold the indicator

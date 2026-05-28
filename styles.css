@@ -140,11 +140,11 @@
   /* Onboarding (modal) */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:100;display:none;align-items:flex-end;justify-content:center}
   .modal.open{display:flex}
-  .sheet{width:100%;max-width:540px;background:var(--bg-soft);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;animation:slideUp .3s ease}
+  .sheet{width:100%;max-width:540px;background:var(--bg-soft);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;overscroll-behavior:contain;animation:slideUp .3s ease;will-change:transform}
   @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
   .sheet h2{margin:8px 0 6px;font-size:22px;font-weight:700;letter-spacing:-.01em}
   .sheet .sub{font-size:14px;color:var(--text-mid);margin-bottom:18px;line-height:1.45}
-  .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px}
+  .sheet .grab{width:36px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 16px;touch-action:none;cursor:grab}
 
   /* Tabs (top within food page) */
   .tabs{display:flex;gap:6px;padding:4px;background:var(--card);border-radius:12px;margin:0 16px}
