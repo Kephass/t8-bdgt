@@ -216,12 +216,25 @@ function fmt(n) {
 /* ── 8. Views: state → DOM ───────────────────────────────────────────────── */
 
 function render() {
+  renderHeader();
   renderHeaderPicker();
   renderHome();
   renderBudgetView();
   renderSetupView();
   renderFoodView();
   if (view.editId) renderEditSheet();
+}
+
+/** Greeting uses the signed-in user's first name (auth metadata). Falls back
+   to the email's local-part, then a generic "there", so it never reads
+   "Hi  —" before a name is set or while signed out behind the splash. */
+function renderHeader() {
+  const el = $('greeting');
+  if (!el) return;
+  const name = auth.firstName()
+    || (cloud.session?.user?.email || '').split('@')[0]
+    || 'there';
+  el.textContent = `Hi ${name} —`;
 }
 
 function renderHeaderPicker() {
@@ -489,6 +502,7 @@ function renderSetupView() {
   $('cfgIncome').value   = state.config.income;
   $('cfgSavings').value  = state.config.savings;
   $('cfgCurrency').value = state.config.currency;
+  $('cfgFirstName').value = auth.firstName();
   renderMembers();   // async; fills #membersCard when it returns
 }
 
@@ -1002,6 +1016,73 @@ function openQuickLog() {
 function closeQuickLog() { closeModal('quickLog'); }
 function pickCategory(id) { closeQuickLog(); openEdit(id); }
 
+/* -- Transactions sheet (header sheets button) ---------------------------- */
+
+/** Short "Mon D" label from a 'YYYY-MM-DD' string, parsed as a local date
+   (avoids the UTC off-by-one that `new Date('YYYY-MM-DD')` causes). */
+function txnDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function openTransactions() { renderTransactions(); openModal('txnsModal'); }
+function closeTransactions() { closeModal('txnsModal'); }
+
+/** Flat list of every entry logged in the selected month, newest-added first.
+   Entry ids are `Date.now().toString(36)` + random, so a descending lexical
+   sort on the id orders by time-added without needing a stored timestamp. */
+function renderTransactions() {
+  const month = view.month;
+  $('txnsSub').textContent = `Entries logged in ${monthName(month)}.`;
+
+  const byCat = state.entries?.[month] || {};
+  const rows = [];
+  for (const catId in byCat) {
+    const cat = state.categories.find(c => c.id === catId);
+    for (const e of byCat[catId]) rows.push({ e, cat, catId });
+  }
+  rows.sort((a, b) => (a.e.id < b.e.id ? 1 : a.e.id > b.e.id ? -1 : 0));
+
+  const list = $('txnsList');
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">No transactions logged this month</div>';
+    return;
+  }
+  list.innerHTML = rows.map(({ e, cat, catId }) => {
+    const catName = cat?.name || 'Uncategorised';
+    const note    = (e.note && e.note.trim()) ? e.note : catName;
+    return `<div class="txn-row" data-action="openTxnCategory" data-id="${escapeHtml(catId)}">
+      <div class="icon ${cat?.color || 'grey'}">${cat?.icon || '•'}</div>
+      <div class="txn-meta">
+        <div class="txn-note">${escapeHtml(note)}</div>
+        <div class="txn-sub">${escapeHtml(catName)} · ${escapeHtml(txnDate(e.date))}</div>
+      </div>
+      <div class="txn-amt">${fmt(+e.amount)}</div>
+    </div>`;
+  }).join('');
+}
+
+/** Tap a transaction → jump into its category's edit sheet. */
+function openTxnCategory(id) { closeTransactions(); openEdit(id); }
+
+/* -- Profile (first name) ------------------------------------------------- */
+
+/** Save the user's first name to auth metadata, then refresh the greeting.
+   Per-user, so it's independent of the shared household config. */
+async function saveProfile() {
+  if (!cloud.session) return;
+  const name = $('cfgFirstName').value.trim();
+  if (name === auth.firstName()) return;   // no-op on unchanged blur
+  try {
+    await auth.updateProfile({ firstName: name });
+    renderHeader();
+    snack('Name updated');
+  } catch (e) {
+    snack('Couldn’t update name: ' + (e.message || String(e)));
+  }
+}
+
 /* -- Add a new category --------------------------------------------------- */
 
 function openAdd() {
@@ -1416,6 +1497,10 @@ const ACTIONS = {
   openQuickLog, closeQuickLog,
   pickCategory:      (_, d) => pickCategory(d.id),
 
+  // Transactions sheet (header sheets button)
+  openTransactions, closeTransactions,
+  openTxnCategory:   (_, d) => openTxnCategory(d.id),
+
   // Budget view reset
   resetPlan,
 
@@ -1445,6 +1530,7 @@ const ACTIONS = {
 /** Inputs with data-on-change="autoSaveConfig" trigger this on blur. */
 const CHANGE_ACTIONS = {
   autoSaveConfig: () => saveConfig(true),
+  autoSaveProfile: () => saveProfile(),
 };
 
 const CONTEXT_ACTIONS = {
@@ -1518,6 +1604,7 @@ const MODAL_CLOSERS = {
   onboard:     closeOnboard,
   quickLog:    closeQuickLog,
   monthPicker: closeMonthPicker,
+  txnsModal:   closeTransactions,
 };
 document.addEventListener('click', e => {
   const t = e.target;

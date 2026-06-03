@@ -233,6 +233,8 @@
   .setup-row .label-inline{flex:1;font-size:14px;font-weight:500}
   .setup-row .num-edit{width:110px;background:var(--card-lo);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;outline:none}
   .setup-row .num-edit:focus{border-color:var(--green)}
+  /* Name input reuses .num-edit's chrome but reads as text: wider, left-aligned, normal weight. */
+  .setup-row .name-edit{width:150px;text-align:left;font-weight:500;font-variant-numeric:normal}
   .toggle{position:relative;width:42px;height:24px;background:var(--line);border-radius:99px;cursor:pointer;transition:background .2s;flex-shrink:0}
   .toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s}
   .toggle.on{background:var(--green)}
@@ -283,6 +285,17 @@
   .entry-row .e-amt{font-weight:700;font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
   .entry-row .e-del{color:var(--text-dim);padding:4px 8px;cursor:pointer;font-size:16px}
   .entry-row .e-del:hover{color:var(--red)}
+
+  /* Transactions sheet — month's entries, newest first. Rows are tappable
+     (jump into the category). Capped height so a busy month scrolls. */
+  .txns-list{max-height:60vh;overflow-y:auto;overscroll-behavior:contain;border-radius:14px;border:1px solid var(--line-soft);background:var(--card)}
+  .txn-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;transition:background .12s}
+  .txn-row:last-child{border-bottom:none}
+  .txn-row:active{background:var(--card-hi)}
+  .txn-meta{flex:1;min-width:0}
+  .txn-note{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .txn-sub{font-size:11px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .txn-amt{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
   .entries-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:13px}
 
   /* Spent / remaining inline on rows */
@@ -350,6 +363,15 @@
   .refresh-btn:active{transform:scale(.9)}
   .refresh-btn.refreshing svg{animation:refresh-spin .8s linear infinite;transform-origin:center}
   @keyframes refresh-spin{to{transform:rotate(360deg)}}
+
+  /* Header sheets button — replaces the old avatar initial; opens the
+     transactions sheet. Sized to sit alongside the refresh button + sync pill. */
+  .icon-btn{appearance:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);padding:0;
+       background:var(--card);color:var(--text-mid);cursor:pointer;
+       display:flex;align-items:center;justify-content:center;
+       transition:background .15s,color .15s,transform .12s,border-color .15s}
+  .icon-btn:hover{background:var(--card-hi);color:var(--text);border-color:var(--line)}
+  .icon-btn:active{transform:scale(.92)}
 
   /* Pull-to-refresh indicator — slides down from the top while pulling */
   .ptr{position:fixed;top:0;left:50%;width:36px;height:36px;border-radius:50%;

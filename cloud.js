@@ -107,11 +107,30 @@ const auth = {
     return data;
   },
 
-  async signUp(email, password) {
-    const { data, error } = await sb.auth.signUp({ email, password });
+  async signUp(email, password, firstName = '') {
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      // first_name lives in the user's auth metadata — it's per-user (each
+      // member of a shared household has their own), so it does NOT belong in
+      // the household config. No schema/migration needed.
+      options: { data: { first_name: firstName.trim() } },
+    });
     if (error) throw error;
     cloud.session = data.session;
     return data;
+  },
+
+  /** First name from the signed-in user's auth metadata, or '' if unset. */
+  firstName() {
+    return cloud.session?.user?.user_metadata?.first_name || '';
+  },
+
+  /** Update the signed-in user's first name in auth metadata. */
+  async updateProfile({ firstName }) {
+    const { data, error } = await sb.auth.updateUser({ data: { first_name: (firstName || '').trim() } });
+    if (error) throw error;
+    if (cloud.session) cloud.session.user = data.user;  // reflect locally
+    return data.user;
   },
 
   async signOut() {

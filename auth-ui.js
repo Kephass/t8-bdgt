@@ -27,6 +27,7 @@ function setAuthTab(tab) {
   for (const b of document.querySelectorAll('#authTabs button')) {
     b.classList.toggle('active', b.dataset.tab === tab);
   }
+  $('authFirstNameWrap').style.display = tab === 'signup' ? '' : 'none';
   $('authSignupExtras').style.display = tab === 'signup' ? '' : 'none';
   $('authSubmit').textContent = tab === 'signup' ? 'Create account' : 'Sign in';
   $('authTitle').textContent  = tab === 'signup' ? 'Create your account' : 'Sign in';
@@ -48,6 +49,7 @@ async function submitAuth() {
   const tab = document.querySelector('#authTabs button.active').dataset.tab;
   const email = $('authEmail').value.trim();
   const password = $('authPassword').value;
+  const firstName = $('authFirstName').value.trim();
   const errEl = $('authError');
   const submitBtn = $('authSubmit');
   errEl.style.display = 'none';
@@ -60,10 +62,11 @@ async function submitAuth() {
     if (tab === 'signin') {
       await auth.signIn(email, password);
     } else {
+      if (!firstName) throw new Error('Enter your first name');
       const mode = document.querySelector('input[name="hhMode"]:checked').value;
       const inviteCode = $('authInviteCode').value.trim().toUpperCase();
       if (mode === 'join' && !inviteCode) throw new Error('Enter an invite code or pick "Create new"');
-      const { session } = await auth.signUp(email, password);
+      const { session } = await auth.signUp(email, password, firstName);
       // Stash the household choice so it survives the email-confirmation round-trip.
       localStorage.setItem('pendingHouseholdSetup', JSON.stringify({ mode, inviteCode }));
       if (!session) throw new Error('Check your email to confirm, then sign in here.');
