@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
@@ -122,17 +122,13 @@
       <div class="rc-ring" id="editRing"></div>
     </div>
 
-    <!-- Quick add transaction -->
-    <label class="label">Add a transaction</label>
-    <div class="entry-add">
-      <input class="input" id="entryNote" type="text" placeholder="Aldi, Q8, etc." />
-      <input class="input" id="entryDate" type="date" style="width:140px" />
-      <input class="input num-input" id="entryAmount" type="text" inputmode="decimal" placeholder="0" style="width:90px" />
-      <button class="add-btn" data-action="addEntry" style="width:44px;height:44px;border-radius:12px">+</button>
-    </div>
-    <p class="help">Tap an entry below to edit or delete it.</p>
+    <!-- Log a transaction → opens the dedicated Add Transaction sheet.
+         (Replaces the old inline note/date/amount + row, whose tiny "+" was
+         easy to miss next to the sheet's bottom "Save".) -->
+    <button class="btn primary btn-block" data-action="addTxnForCurrent">+ Add transaction</button>
 
     <!-- Entries list -->
+    <p class="help" style="margin:16px 0 6px">Logged this month — tap × to remove an entry.</p>
     <div class="entries-wrap" id="entriesWrap"></div>
 
     <details style="margin-top:18px">
@@ -149,8 +145,41 @@
     </details>
 
     <div class="btn-row" style="margin:18px 0 0">
-      <button class="btn ghost btn-block" data-action="closeEdit">Cancel</button>
-      <button class="btn primary btn-block" data-action="saveEdit">Save</button>
+      <button class="btn ghost btn-block" data-action="closeEdit">Done</button>
+      <button class="btn primary btn-block" data-action="saveEdit">Save budget</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TRANSACTION SHEET — dedicated, single-purpose logging surface
+     (modeled on Rocket Money's "Add a Transaction"). The only primary action
+     here is "Add transaction"; budget editing lives in the edit sheet, never
+     alongside this form. Amount leads as the focal field. -->
+<div class="modal" id="addTxnModal">
+  <div class="sheet">
+    <div class="grab"></div>
+
+    <!-- Category chip, tinted in the category's colour (set in openAddTxn). -->
+    <div class="txn-cat-chip grey" id="txnCatChip">
+      <span class="icon grey" id="txnCatIcon">•</span>
+      <span class="txn-cat-text">
+        <span class="txn-cat-kicker">Adding to</span>
+        <span class="txn-cat-name" id="txnCatName">Category</span>
+      </span>
+    </div>
+
+    <label class="label">Amount</label>
+    <input class="input num-input txn-amount" id="txnAmount" type="text" inputmode="decimal" placeholder="0" />
+
+    <label class="label">Note</label>
+    <input class="input" id="txnNote" type="text" placeholder="What was it for?" />
+
+    <label class="label">Date</label>
+    <input class="input" id="txnDate" type="date" />
+
+    <div class="btn-row" style="margin:20px 0 0">
+      <button class="btn ghost btn-block" data-action="closeAddTxn">Cancel</button>
+      <button class="btn primary btn-block" data-action="addTransaction">Add transaction</button>
     </div>
   </div>
 </div>
@@ -295,7 +324,7 @@
 
     <div class="btn-row">
       <button class="btn ghost btn-block" data-action="openOnboard" data-replan="true">Re-plan month</button>
-      <button class="btn primary btn-block" data-action="openAdd">+ Add</button>
+      <button class="btn primary btn-block" data-action="openAdd">+ Add Category</button>
     </div>
   </section>
 
@@ -496,6 +525,6 @@
 <script src="cloud.js?v=5"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=2"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

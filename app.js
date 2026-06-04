@@ -54,6 +54,9 @@ const dayKey    = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.ge
 const monthKey  = d => dayKey(d).slice(0, 7);
 const today     = () => dayKey(new Date());
 const thisMonth = () => monthKey(new Date());
+/** Default date for a new entry in the viewed month: today when it's the
+   current month, else the 15th — so the entry lands in the month on screen. */
+const seedEntryDate = () => view.month === thisMonth() ? today() : `${view.month}-15`;
 
 /** Friendly label for a 'YYYY-MM' key, e.g. 'May 2026'. */
 const monthName = key =>
@@ -350,7 +353,11 @@ function renderHomeHeroChart() {
   const W = 320, H = 110;
   const max = Math.max(1, cum[cutoffDay] || 1);
   const xFor = day => daysInMonth > 1 ? ((day - 1) / (daysInMonth - 1)) * W : W / 2;
-  const yFor = val => H - (val / max) * (H - 8) - 4;
+  // Vertical insets reserve headroom so the end-of-line marker (a circle of
+  // r=5) clears the chart's top/bottom edges. The latest point always maps to
+  // the scale max, so without TOP_PAD its dot would clip against the top border.
+  const TOP_PAD = 14, BOT_PAD = 6;
+  const yFor = val => H - (val / max) * (H - TOP_PAD - BOT_PAD) - BOT_PAD;
   const points = [];
   for (let i = 1; i <= cutoffDay; i++) points.push([xFor(i), yFor(cum[i])]);
   if (points.length === 1) points.unshift([0, yFor(0)]);  // need 2 points for a visible stroke
@@ -702,8 +709,12 @@ function renderEditSheet() {
 }
 
 function renderEditEntries(cat) {
+  // Newest-ADDED first, so a freshly logged amount always lands on top —
+  // regardless of the spend date chosen. Entry ids are `Date.now()`-based
+  // (base36 time prefix + random), so a descending lexical sort on the id
+  // orders by time-added. Matches the Transactions sheet (renderTransactions).
   const entries = derive.entries(cat.id).slice()
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   $('entriesWrap').innerHTML = entries.length
     ? entries.map(e => {
         const date = e.date
@@ -716,7 +727,7 @@ function renderEditEntries(cat) {
         <div class="e-del" data-action="deleteEntry" data-id="${e.id}">×</div>
       </div>`;
       }).join('')
-    : '<div class="entries-empty">No entries yet — add the first transaction above.</div>';
+    : '<div class="entries-empty">No entries yet — tap “Add transaction” above.</div>';
 }
 
 function renderEditBudgetScope(cat) {
@@ -902,15 +913,10 @@ function openEdit(id) {
   $('editAmount').value = derive.budget(cat);
   $('editNote').value   = cat.note || '';
   $('editLock').classList.toggle('on', !!cat.locked);
-  $('entryNote').value   = '';
-  $('entryAmount').value = '';
-  // Seed date input — today's date if viewing the current month, else the 15th.
-  $('entryDate').value = view.month === thisMonth() ? today() : `${view.month}-15`;
   // Make sure the overflow menu is closed when reopening.
   const em = $('editMenu'); if (em) em.hidden = true;
   renderEditSheet();
   openModal('editModal');
-  setTimeout(() => $('entryAmount').focus(), 80);
 }
 
 function closeEdit() {
@@ -946,18 +952,47 @@ function resetMonthBudget(e) {
   snack('Reset to default');
 }
 
-function addEntry() {
-  const cat = editingCategory(); if (!cat) return;
-  const amount = parseAmount($('entryAmount').value);
+/* -- Add Transaction sheet (dedicated logging surface) -------------------- */
+
+/** Open the Add Transaction sheet for a category. Works whether or not the
+   edit sheet is open behind it (the FAB quick-log path skips the edit sheet),
+   so the target category is tracked on `view.addTxnCat`, not `view.editId`. */
+function openAddTxn(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return;
+  view.addTxnCat = catId;
+
+  // Category chip — tinted in the category's colour.
+  const color = cat.color || 'grey';
+  $('txnCatName').textContent = cat.name;
+  const icon = $('txnCatIcon');
+  icon.textContent = cat.icon || '•';
+  icon.className = 'icon ' + color;
+  $('txnCatChip').className = 'txn-cat-chip ' + color;
+
+  // Reset fields. Date defaults to the viewed month (see seedEntryDate).
+  $('txnAmount').value = '';
+  $('txnNote').value   = '';
+  $('txnDate').value   = seedEntryDate();
+
+  openModal('addTxnModal');
+  setTimeout(() => $('txnAmount').focus(), 80);
+}
+
+function closeAddTxn() { closeModal('addTxnModal'); view.addTxnCat = null; }
+
+/** Commit a new transaction from the Add Transaction sheet, using its own
+   inputs and tracked category (view.addTxnCat). cloud's month_key is derived
+   from date.slice(0,7); the local bucket is keyed the same way, so an entry
+   dated outside view.month still lands correctly. */
+function addTransaction() {
+  const catId = view.addTxnCat;
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const amount = parseAmount($('txnAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
-  const note = $('entryNote').value.trim() || cat.name;
-  // Read the date from the picker. cloud's month_key is derived from this
-  // date.slice(0,7), so the entry's month bucket follows the date directly.
-  // The local state.entries bucket is keyed by entry.date.slice(0,7) too,
-  // not view.month — so entries written for a different month than the one
-  // currently being viewed still land in the right place locally.
-  const fallback = view.month === thisMonth() ? today() : `${view.month}-15`;
-  const date = $('entryDate').value || fallback;
+  const note = $('txnNote').value.trim() || cat.name;
+  const date = $('txnDate').value || seedEntryDate();
   const monthKey = date.slice(0, 7);
   const entry = { id: newId(), amount, note, date };
   commit(s => {
@@ -965,11 +1000,10 @@ function addEntry() {
     list.push(entry);
   });
   sync.upsertEntry(cat.id, entry);
-  $('entryNote').value   = '';
-  $('entryAmount').value = '';
-  $('entryDate').value   = fallback;
+  // commit() already re-rendered everything (incl. the edit sheet behind this
+  // one, if open) — just close and confirm.
+  closeAddTxn();
   snack(`${fmt(amount)} logged${monthKey !== view.month ? ' in ' + monthName(monthKey) : ''}`);
-  setTimeout(() => $('entryAmount').focus(), 50);
 }
 
 function deleteEntry(entryId) {
@@ -1014,7 +1048,9 @@ function openQuickLog() {
   openModal('quickLog');
 }
 function closeQuickLog() { closeModal('quickLog'); }
-function pickCategory(id) { closeQuickLog(); openEdit(id); }
+// Quick-log goes straight to the Add Transaction sheet — logging is the goal,
+// no need to detour through the category's edit sheet.
+function pickCategory(id) { closeQuickLog(); openAddTxn(id); }
 
 /* -- Transactions sheet (header sheets button) ---------------------------- */
 
@@ -1465,9 +1501,14 @@ const ACTIONS = {
 
   // Edit category sheet
   openEdit:          (_, d) => openEdit(d.id),
-  closeEdit, saveEdit, deleteCategory, addEntry,
+  closeEdit, saveEdit, deleteCategory,
   deleteEntry:       (_, d) => deleteEntry(d.id),
   resetMonthBudget:   e     => resetMonthBudget(e),
+
+  // Add Transaction sheet
+  openAddTxn:        (_, d) => openAddTxn(d.id),
+  addTxnForCurrent:  ()     => { if (view.editId) openAddTxn(view.editId); },
+  closeAddTxn, addTransaction,
 
   // Lock toggles shared by edit + add modals
   toggleLockClass:   (_, __, el) => el.classList.toggle('on'),
@@ -1568,7 +1609,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const id = document.activeElement?.id;
   if (id === 'shopItem')                              addShopItem();
-  if (id === 'entryNote' || id === 'entryAmount')     addEntry();
+  if (id === 'txnNote' || id === 'txnAmount')         addTransaction();
 });
 
 // Long-press on a shopping item opens its context menu on touch devices.
@@ -1600,6 +1641,7 @@ window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, tr
    target === the modal. */
 const MODAL_CLOSERS = {
   editModal:   closeEdit,
+  addTxnModal: closeAddTxn,
   addModal:    closeAdd,
   onboard:     closeOnboard,
   quickLog:    closeQuickLog,
