@@ -57,6 +57,16 @@ const thisMonth = () => monthKey(new Date());
 /** Default date for a new entry in the viewed month: today when it's the
    current month, else the 15th — so the entry lands in the month on screen. */
 const seedEntryDate = () => view.month === thisMonth() ? today() : `${view.month}-15`;
+/** 'YYYY-MM-DD' → "Jun 6", parsed as a LOCAL date (avoids the UTC off-by-one
+   that `new Date('YYYY-MM-DD')` causes). Shared by every entry/want list. */
+const shortDate = iso => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+/** Sort comparator: newest-ADDED first. Entry/want ids are `Date.now()`-based
+   (base36 time prefix + random), so a descending lexical id sort = time-added. */
+const byNewest = (a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 
 /** Friendly label for a 'YYYY-MM' key, e.g. 'May 2026'. */
 const monthName = key =>
@@ -228,7 +238,7 @@ function render() {
   renderSetupView();
   renderFoodView();
   if (view.editId) renderEditSheet();
-  if ($('wantsModal')?.classList.contains('open')) renderWants();
+  if (view.wantsOpen) renderWants();
 }
 
 /** Greeting uses the signed-in user's first name (auth metadata). Falls back
@@ -712,20 +722,14 @@ function renderEditSheet() {
 }
 
 function renderEditEntries(cat) {
-  // Newest-ADDED first, so a freshly logged amount always lands on top —
-  // regardless of the spend date chosen. Entry ids are `Date.now()`-based
-  // (base36 time prefix + random), so a descending lexical sort on the id
-  // orders by time-added. Matches the Transactions sheet (renderTransactions).
-  const entries = derive.entries(cat.id).slice()
-    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+  // Newest-ADDED first (see byNewest), so a freshly logged amount always lands
+  // on top regardless of the spend date chosen.
+  const entries = derive.entries(cat.id).slice().sort(byNewest);
   $('entriesWrap').innerHTML = entries.length
     ? entries.map(e => {
-        const date = e.date
-          ? new Date(e.date + 'T00:00').toLocaleString('en-US', { month: 'short', day: 'numeric' })
-          : '';
         return `<div class="entry-row">
         <div class="e-note">${escapeHtml(e.note || '(no note)')}</div>
-        <div class="e-date">${date}</div>
+        <div class="e-date">${shortDate(e.date)}</div>
         <div class="e-amt num">${fmt(+e.amount)}</div>
         <div class="e-del" data-action="deleteEntry" data-id="${e.id}">×</div>
       </div>`;
@@ -820,23 +824,19 @@ function openOnboard(replan) {
     : "Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.";
   $('incomeInput').value = state.config.income || '';
   $('saveInput').value   = state.config.savings || '';
-  $('cofidisToggle').classList.toggle('on', !!state.config.cofidis);
   openModal('onboard');
 }
 function closeOnboard()  { closeModal('onboard'); }
-function toggleCofidis() { $('cofidisToggle').classList.toggle('on'); }
 
 function applyOnboard() {
   const income  = parseAmount($('incomeInput').value);
   const savings = parseAmount($('saveInput').value);
-  const cofidis = $('cofidisToggle').classList.contains('on');
   commit(s => {
     s.config.income   = income;
     s.config.savings  = savings;
-    s.config.cofidis  = cofidis;
     rebalanceMonth(s, view.month, income, savings);
   });
-  sync.updateConfig({ income, savings, cofidis });
+  sync.updateConfig({ income, savings });
   // Push every override for this month so DB matches the rebalanced state.
   for (const cat of state.categories) {
     if (derive.hasOverride(cat.id)) {
@@ -1089,14 +1089,6 @@ function pickCategory(id) { closeQuickLog(); openAddTxn(id); }
 
 /* -- Transactions sheet (header sheets button) ---------------------------- */
 
-/** Short "Mon D" label from a 'YYYY-MM-DD' string, parsed as a local date
-   (avoids the UTC off-by-one that `new Date('YYYY-MM-DD')` causes). */
-function txnDate(iso) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 /* -- Lists menu (header button popover) ----------------------------------- */
 
 function toggleListMenu() { const m = $('listMenu'); if (m) m.hidden = !m.hidden; }
@@ -1118,7 +1110,7 @@ function renderTransactions() {
     const cat = state.categories.find(c => c.id === catId);
     for (const e of byCat[catId]) rows.push({ e, cat, catId });
   }
-  rows.sort((a, b) => (a.e.id < b.e.id ? 1 : a.e.id > b.e.id ? -1 : 0));
+  rows.sort((a, b) => byNewest(a.e, b.e));
 
   const list = $('txnsList');
   if (!rows.length) {
@@ -1132,7 +1124,7 @@ function renderTransactions() {
       <div class="icon ${cat?.color || 'grey'}">${cat?.icon || '•'}</div>
       <div class="txn-meta">
         <div class="txn-note">${escapeHtml(note)}</div>
-        <div class="txn-sub">${escapeHtml(catName)} · ${escapeHtml(txnDate(e.date))}</div>
+        <div class="txn-sub">${escapeHtml(catName)} · ${escapeHtml(shortDate(e.date))}</div>
       </div>
       <div class="txn-amt">${fmt(+e.amount)}</div>
     </div>`;
@@ -1144,8 +1136,8 @@ function openTxnCategory(id) { closeTransactions(); openEdit(id); }
 
 /* -- Needs & Wants (household-shared buy list) ---------------------------- */
 
-function openWants()  { closeListMenu(); renderWants(); openModal('wantsModal'); }
-function closeWants() { closeModal('wantsModal'); }
+function openWants()  { closeListMenu(); view.wantsOpen = true; renderWants(); openModal('wantsModal'); }
+function closeWants() { view.wantsOpen = false; closeModal('wantsModal'); }
 
 function addWant() {
   const name = $('wantInput').value.trim();
@@ -1180,10 +1172,9 @@ function removeWant(id) {
    recently bought first (by buy date, then add order). */
 function renderWants() {
   const wants = state.wants || [];
-  const open = wants.filter(w => !w.done)
-    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+  const open = wants.filter(w => !w.done).sort(byNewest);
   const done = wants.filter(w => w.done)
-    .sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || '') || (a.id < b.id ? 1 : -1));
+    .sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || '') || byNewest(a, b));
 
   $('wantsOpenCount').textContent = open.length;
   $('wantsDoneCount').textContent = done.length;
@@ -1202,17 +1193,10 @@ function renderWants() {
         <div class="want-item done" data-action="toggleWant" data-id="${w.id}">
           <div class="check"></div>
           <div class="text">${escapeHtml(w.item)}</div>
-          <div class="want-date">${escapeHtml(wantDate(w.boughtAt))}</div>
+          <div class="want-date">${escapeHtml(shortDate(w.boughtAt))}</div>
           <div class="want-del" data-action="removeWant" data-id="${w.id}" aria-label="Remove">×</div>
         </div>`).join('')
     : '<div class="entries-empty">Nothing purchased yet.</div>';
-}
-
-/** 'YYYY-MM-DD' → "Jun 6" (parsed as local to avoid the UTC off-by-one). */
-function wantDate(iso) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /* -- Profile (first name) ------------------------------------------------- */
@@ -1630,7 +1614,7 @@ const ACTIONS = {
 
   // Onboarding
   openOnboard:       (_, d) => openOnboard(d.replan === 'true'),
-  closeOnboard, applyOnboard, toggleCofidis,
+  closeOnboard, applyOnboard,
 
   // Edit category sheet
   openEdit:          (_, d) => openEdit(d.id),
