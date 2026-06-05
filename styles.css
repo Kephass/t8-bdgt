@@ -154,6 +154,11 @@
   .splash-wordmark{font-size:18px;font-weight:700;letter-spacing:.02em;color:#fff;text-shadow:0 1px 16px rgba(0,0,0,.25)}
   @media (prefers-reduced-motion: reduce){.splash{transition-duration:.001s}}
 
+  /* Confirm dialog — a tighter, more focused sheet than the full-width ones. */
+  .confirm-sheet{max-width:430px}
+  .confirm-sheet h2{margin-bottom:8px}
+  .confirm-sheet .sub{margin-bottom:2px;line-height:1.5}
+
   /* Onboarding (modal) */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:100;display:none;align-items:flex-end;justify-content:center}
   .modal.open{display:flex}

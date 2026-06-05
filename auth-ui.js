@@ -82,7 +82,12 @@ async function submitAuth() {
 }
 
 async function signOutNow() {
-  if (!confirm('Sign out? You can sign back in any time.')) return;
+  const ok = await confirmModal({
+    title: 'Sign out?',
+    message: 'You can sign back in any time.',
+    confirmLabel: 'Sign out',
+  });
+  if (!ok) return;
   await auth.signOut();
   state = blankState();
   localStorage.removeItem(STORE_KEY);

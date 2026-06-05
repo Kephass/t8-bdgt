@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
@@ -147,6 +147,22 @@
     <div class="btn-row" style="margin:18px 0 0">
       <button class="btn ghost btn-block" data-action="closeEdit">Done</button>
       <button class="btn primary btn-block" data-action="saveEdit">Save budget</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG — reusable, Promise-driven replacement for window.confirm().
+     Sits above all other sheets (z-index > .modal's 100). Title/message/labels
+     are set per-call by confirmModal(); the OK button gets .danger for
+     destructive actions. -->
+<div class="modal" id="confirmModal" style="z-index:130">
+  <div class="sheet confirm-sheet">
+    <div class="grab"></div>
+    <h2 id="confirmTitle">Are you sure?</h2>
+    <p class="sub" id="confirmMessage"></p>
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" id="confirmCancel" data-action="confirmCancel">Cancel</button>
+      <button class="btn primary btn-block" id="confirmOk" data-action="confirmOk">Confirm</button>
     </div>
   </div>
 </div>
@@ -524,7 +540,7 @@
 <script src="defaults.js?v=1"></script>
 <script src="cloud.js?v=5"></script>
 <script src="migrations.js?v=1"></script>
-<script src="auth-ui.js?v=2"></script>
-<script src="app.js?v=23"></script>
+<script src="auth-ui.js?v=3"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>

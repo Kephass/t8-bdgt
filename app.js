@@ -766,6 +766,33 @@ const closeModal = id => {
   setTimeout(() => el.classList.remove('open', 'closing'), CLOSE_MS);
 };
 
+/* -- Confirm dialog -------------------------------------------------------
+   Promise-based replacement for window.confirm(). Call it with `await` from
+   any (async) action; it resolves true on confirm, false on cancel / tap-out
+   / Escape. One shared sheet, one pending resolver at a time. */
+let _confirmResolve = null;
+function confirmModal({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+  $('confirmTitle').textContent   = title;
+  $('confirmMessage').textContent = message;
+  $('confirmCancel').textContent  = cancelLabel;
+  const ok = $('confirmOk');
+  ok.textContent = confirmLabel;
+  ok.classList.toggle('danger', danger);
+  ok.classList.toggle('primary', !danger);
+  openModal('confirmModal');
+  setTimeout(() => ok.focus(), 80);
+  // Resolve any prior pending call as cancelled before taking over.
+  if (_confirmResolve) _confirmResolve(false);
+  return new Promise(resolve => { _confirmResolve = resolve; });
+}
+function settleConfirm(result) {
+  if (!$('confirmModal').classList.contains('open')) return;
+  closeModal('confirmModal');
+  const resolve = _confirmResolve;
+  _confirmResolve = null;
+  if (resolve) resolve(result);
+}
+
 /* -- Screen navigation ---------------------------------------------------- */
 
 function setView(screen) {
@@ -1017,10 +1044,15 @@ function deleteEntry(entryId) {
   snack('Entry removed');
 }
 
-function deleteCategory() {
+async function deleteCategory() {
   const cat = editingCategory(); if (!cat) return;
   const count = derive.entries(cat.id).length;
-  if (!confirm(`Delete "${cat.name}"? All ${count} entries this month will go with it.`)) return;
+  const ok = await confirmModal({
+    title: 'Delete category?',
+    message: `“${cat.name}” and all ${count} ${count === 1 ? 'entry' : 'entries'} this month will be removed.`,
+    confirmLabel: 'Delete', danger: true,
+  });
+  if (!ok) return;
   commit(s => {
     s.categories = s.categories.filter(c => c.id !== cat.id);
     for (const m in s.entries) delete s.entries[m][cat.id];
@@ -1177,7 +1209,12 @@ async function copyInvite() {
 }
 
 async function rotateInvite() {
-  if (!confirm('Generate a new invite code? The old code stops working immediately. Existing members keep their access.')) return;
+  const ok = await confirmModal({
+    title: 'Generate a new invite code?',
+    message: 'The old code stops working immediately. Existing members keep their access.',
+    confirmLabel: 'Generate',
+  });
+  if (!ok) return;
   try {
     const newCode = await auth.rotateInviteCode();
     $('acctInvite').textContent = newCode;
@@ -1188,7 +1225,12 @@ async function rotateInvite() {
 }
 
 async function removeMember(userId) {
-  if (!confirm("Remove this member? They lose access to the household immediately.")) return;
+  const ok = await confirmModal({
+    title: 'Remove this member?',
+    message: 'They lose access to the household immediately.',
+    confirmLabel: 'Remove', danger: true,
+  });
+  if (!ok) return;
   try {
     await auth.removeMember(userId);
     snack('Member removed');
@@ -1431,8 +1473,13 @@ async function refresh() {
 
 /* -- Resets -------------------------------------------------------------- */
 
-function resetPlan() {
-  if (!confirm('Reset all budget amounts to defaults? Meal plans and shopping list will be kept.')) return;
+async function resetPlan() {
+  const ok = await confirmModal({
+    title: 'Reset all budgets to defaults?',
+    message: 'Every budget amount goes back to the seeded defaults. Meal plans and shopping list are kept.',
+    confirmLabel: 'Reset plan', danger: true,
+  });
+  if (!ok) return;
   const defaults = structuredClone(DEFAULTS.categories);
   const defaultIds = new Set(defaults.map(c => c.id));
   // Delete categories the user added that aren't in DEFAULTS.
@@ -1445,7 +1492,12 @@ function resetPlan() {
   snack('Plan reset');
 }
 async function hardReset() {
-  if (!confirm('This signs you out. Your cloud data stays on the server — ask the admin to delete the household if you want it gone. Continue?')) return;
+  const ok = await confirmModal({
+    title: 'Wipe local data & sign out?',
+    message: 'This signs you out and clears local data. Your cloud household stays on the server — ask the admin to delete it if you want it gone.',
+    confirmLabel: 'Wipe & sign out', danger: true,
+  });
+  if (!ok) return;
   await auth.signOut();
   state = blankState();
   localStorage.removeItem(STORE_KEY);
@@ -1566,6 +1618,10 @@ const ACTIONS = {
 
   // Tap the sync pill — show last error if any
   showSyncStatus:   () => snack(cloud.lastError ? `Sync error: ${cloud.lastError}` : 'Up to date'),
+
+  // Confirm dialog
+  confirmOk:        () => settleConfirm(true),
+  confirmCancel:    () => settleConfirm(false),
 };
 
 /** Inputs with data-on-change="autoSaveConfig" trigger this on blur. */
@@ -1606,6 +1662,11 @@ document.addEventListener('click', e => {
 
 // Enter submits the shopping and transaction inputs.
 document.addEventListener('keydown', e => {
+  // Escape cancels the confirm dialog (Enter is handled by the focused button).
+  if (e.key === 'Escape' && $('confirmModal').classList.contains('open')) {
+    settleConfirm(false);
+    return;
+  }
   if (e.key !== 'Enter') return;
   const id = document.activeElement?.id;
   if (id === 'shopItem')                              addShopItem();
@@ -1640,13 +1701,14 @@ window.addEventListener('scroll', () => { if (view.ctxId) closeShopMenu(); }, tr
    bubble through the sheet first and never reach this listener as
    target === the modal. */
 const MODAL_CLOSERS = {
-  editModal:   closeEdit,
-  addTxnModal: closeAddTxn,
-  addModal:    closeAdd,
-  onboard:     closeOnboard,
-  quickLog:    closeQuickLog,
-  monthPicker: closeMonthPicker,
-  txnsModal:   closeTransactions,
+  editModal:    closeEdit,
+  addTxnModal:  closeAddTxn,
+  addModal:     closeAdd,
+  onboard:      closeOnboard,
+  quickLog:     closeQuickLog,
+  monthPicker:  closeMonthPicker,
+  txnsModal:    closeTransactions,
+  confirmModal: () => settleConfirm(false),   // tap backdrop = cancel
 };
 document.addEventListener('click', e => {
   const t = e.target;
