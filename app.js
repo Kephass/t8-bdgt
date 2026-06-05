@@ -107,6 +107,7 @@ function blankState() {
     meals:           {},
     shopping:        {},
     budgetOverrides: {},
+    wants:           [],
     flags:           {},
   };
 }
@@ -121,6 +122,7 @@ function load() {
       meals:           saved.meals           || {},
       shopping:        saved.shopping        || {},
       budgetOverrides: saved.budgetOverrides || {},
+      wants:           saved.wants           || [],
       flags:           saved.flags           || {},
     };
   } catch { /* corrupt → fall through to blank */ }
@@ -226,6 +228,7 @@ function render() {
   renderSetupView();
   renderFoodView();
   if (view.editId) renderEditSheet();
+  if ($('wantsModal')?.classList.contains('open')) renderWants();
 }
 
 /** Greeting uses the signed-in user's first name (auth metadata). Falls back
@@ -1094,7 +1097,12 @@ function txnDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function openTransactions() { renderTransactions(); openModal('txnsModal'); }
+/* -- Lists menu (header button popover) ----------------------------------- */
+
+function toggleListMenu() { const m = $('listMenu'); if (m) m.hidden = !m.hidden; }
+function closeListMenu()  { const m = $('listMenu'); if (m) m.hidden = true; }
+
+function openTransactions() { closeListMenu(); renderTransactions(); openModal('txnsModal'); }
 function closeTransactions() { closeModal('txnsModal'); }
 
 /** Flat list of every entry logged in the selected month, newest-added first.
@@ -1133,6 +1141,79 @@ function renderTransactions() {
 
 /** Tap a transaction → jump into its category's edit sheet. */
 function openTxnCategory(id) { closeTransactions(); openEdit(id); }
+
+/* -- Needs & Wants (household-shared buy list) ---------------------------- */
+
+function openWants()  { closeListMenu(); renderWants(); openModal('wantsModal'); }
+function closeWants() { closeModal('wantsModal'); }
+
+function addWant() {
+  const name = $('wantInput').value.trim();
+  if (!name) return;
+  const want = { id: newId(), item: name, done: false, boughtAt: null };
+  commit(s => s.wants.push(want));
+  sync.upsertWant(want);
+  $('wantInput').value = '';
+  $('wantInput').focus();
+}
+
+/** Check/uncheck an item. Checking stamps the buy date and moves it to the
+   Purchased accordion; unchecking clears the date and sends it back to Open. */
+function toggleWant(id) {
+  let changed = null;
+  commit(s => {
+    const w = s.wants.find(x => x.id === id);
+    if (!w) return;
+    w.done = !w.done;
+    w.boughtAt = w.done ? today() : null;
+    changed = w;
+  });
+  if (changed) sync.upsertWant(changed);
+}
+
+function removeWant(id) {
+  commit(s => { s.wants = s.wants.filter(x => x.id !== id); });
+  sync.deleteWant(id);
+}
+
+/** Render the two accordions. Open = newest-added first; Purchased = most
+   recently bought first (by buy date, then add order). */
+function renderWants() {
+  const wants = state.wants || [];
+  const open = wants.filter(w => !w.done)
+    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+  const done = wants.filter(w => w.done)
+    .sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || '') || (a.id < b.id ? 1 : -1));
+
+  $('wantsOpenCount').textContent = open.length;
+  $('wantsDoneCount').textContent = done.length;
+
+  $('wantsOpenList').innerHTML = open.length
+    ? open.map(w => `
+        <div class="want-item" data-action="toggleWant" data-id="${w.id}">
+          <div class="check"></div>
+          <div class="text">${escapeHtml(w.item)}</div>
+          <div class="want-del" data-action="removeWant" data-id="${w.id}" aria-label="Remove">×</div>
+        </div>`).join('')
+    : '<div class="entries-empty">Nothing on the list — add something above.</div>';
+
+  $('wantsDoneList').innerHTML = done.length
+    ? done.map(w => `
+        <div class="want-item done" data-action="toggleWant" data-id="${w.id}">
+          <div class="check"></div>
+          <div class="text">${escapeHtml(w.item)}</div>
+          <div class="want-date">${escapeHtml(wantDate(w.boughtAt))}</div>
+          <div class="want-del" data-action="removeWant" data-id="${w.id}" aria-label="Remove">×</div>
+        </div>`).join('')
+    : '<div class="entries-empty">Nothing purchased yet.</div>';
+}
+
+/** 'YYYY-MM-DD' → "Jun 6" (parsed as local to avoid the UTC off-by-one). */
+function wantDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 /* -- Profile (first name) ------------------------------------------------- */
 
@@ -1590,9 +1671,15 @@ const ACTIONS = {
   openQuickLog, closeQuickLog,
   pickCategory:      (_, d) => pickCategory(d.id),
 
-  // Transactions sheet (header sheets button)
+  // Lists menu (header button popover) + sheets
+  toggleListMenu, closeListMenu,
   openTransactions, closeTransactions,
   openTxnCategory:   (_, d) => openTxnCategory(d.id),
+
+  // Needs & Wants
+  openWants, closeWants, addWant,
+  toggleWant:        (_, d) => toggleWant(d.id),
+  removeWant:        (_, d) => removeWant(d.id),
 
   // Budget view reset
   resetPlan,
@@ -1660,6 +1747,14 @@ document.addEventListener('click', e => {
   menu.hidden = true;
 });
 
+// Close the lists popover on any outside click (the button toggles it itself).
+document.addEventListener('click', e => {
+  const menu = $('listMenu');
+  if (!menu || menu.hidden) return;
+  if (e.target.closest('#listMenu') || e.target.closest('#txnsBtn')) return;
+  menu.hidden = true;
+});
+
 // Enter submits the shopping and transaction inputs.
 document.addEventListener('keydown', e => {
   // Escape cancels the confirm dialog (Enter is handled by the focused button).
@@ -1667,9 +1762,12 @@ document.addEventListener('keydown', e => {
     settleConfirm(false);
     return;
   }
+  // Escape closes the lists popover.
+  if (e.key === 'Escape' && !$('listMenu')?.hidden) { closeListMenu(); return; }
   if (e.key !== 'Enter') return;
   const id = document.activeElement?.id;
   if (id === 'shopItem')                              addShopItem();
+  if (id === 'wantInput')                             addWant();
   if (id === 'txnNote' || id === 'txnAmount')         addTransaction();
 });
 
@@ -1708,6 +1806,7 @@ const MODAL_CLOSERS = {
   quickLog:     closeQuickLog,
   monthPicker:  closeMonthPicker,
   txnsModal:    closeTransactions,
+  wantsModal:   closeWants,
   confirmModal: () => settleConfirm(false),   // tap backdrop = cancel
 };
 document.addEventListener('click', e => {

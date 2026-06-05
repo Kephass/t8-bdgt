@@ -216,6 +216,7 @@ async function hydrate() {
     { data: meals,      error: e4 },
     { data: shopping,   error: e5 },
     { data: overrides,  error: e6 },
+    { data: wants,      error: e7 },
   ] = await Promise.all([
     sb.from('households').select('income, savings, currency, cofidis').eq('id', hid).single(),
     sb.from('categories').select('*').eq('household_id', hid).order('sort_order'),
@@ -223,8 +224,9 @@ async function hydrate() {
     sb.from('meals').select('*').eq('household_id', hid),
     sb.from('shopping_items').select('*').eq('household_id', hid),
     sb.from('budget_overrides').select('*').eq('household_id', hid),
+    sb.from('wants').select('*').eq('household_id', hid),
   ]);
-  const err = e1 || e2 || e3 || e4 || e5 || e6;
+  const err = e1 || e2 || e3 || e4 || e5 || e6 || e7;
   if (err) { note('hydrate', err); return; }
 
   // Reseat the in-memory state to match what came down.
@@ -261,6 +263,9 @@ async function hydrate() {
   for (const o of overrides) {
     (state.budgetOverrides[o.month_key] ||= {})[o.category_id] = +o.amount;
   }
+  state.wants = (wants || []).map(w => ({
+    id: w.id, item: w.item, done: !!w.done, boughtAt: w.bought_at || null,
+  }));
 
   save();   // mirror to localStorage
   render();
@@ -377,6 +382,28 @@ const sync = {
     if (!cloud.householdId) return;
     track('deleteShopItem', async () => {
       const { error } = await sb.from('shopping_items').delete().eq('id', itemId);
+      if (error) throw error;
+    });
+  },
+
+  // ── needs & wants ──────────────────────────────────────────────────────
+  upsertWant(want) {
+    if (!cloud.householdId) return;
+    track('upsertWant', async () => {
+      const { error } = await sb.from('wants').upsert({
+        id: want.id,
+        household_id: cloud.householdId,
+        item: want.item,
+        done: !!want.done,
+        bought_at: want.boughtAt || null,
+      });
+      if (error) throw error;
+    });
+  },
+  deleteWant(itemId) {
+    if (!cloud.householdId) return;
+    track('deleteWant', async () => {
+      const { error } = await sb.from('wants').delete().eq('id', itemId);
       if (error) throw error;
     });
   },

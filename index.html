@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=14">
 <!-- Supabase JS client (UMD build exposes a `supabase` global) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"></script>
 </head>
@@ -240,6 +240,36 @@
   </div>
 </div>
 
+<!-- NEEDS & WANTS SHEET — household-shared buy list. Add items up top; they
+     live in the Open accordion until checked off, then move to Purchased
+     (with the date bought). -->
+<div class="modal" id="wantsModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Needs &amp; Wants</h2>
+    <p class="sub">Things to buy. Check one off once you’ve bought it.</p>
+
+    <div class="want-add">
+      <input id="wantInput" type="text" placeholder="Add something to buy" />
+      <button class="add-btn" data-action="addWant" aria-label="Add item">+</button>
+    </div>
+
+    <details class="want-acc" id="wantsOpenAcc" open>
+      <summary class="want-summary">Open <span class="want-count" id="wantsOpenCount">0</span></summary>
+      <div class="card want-card" id="wantsOpenList"></div>
+    </details>
+
+    <details class="want-acc" id="wantsDoneAcc">
+      <summary class="want-summary">Purchased <span class="want-count" id="wantsDoneCount">0</span></summary>
+      <div class="card want-card" id="wantsDoneList"></div>
+    </details>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" data-action="closeWants">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- TRANSACTIONS SHEET — every entry logged in the selected month, newest first. -->
 <div class="modal" id="txnsModal">
   <div class="sheet">
@@ -260,7 +290,7 @@
       <div class="greeting" id="greeting">Hi Felix —</div>
       <div class="month">Family budget</div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;position:relative">
       <button id="syncStatus" type="button" class="sync-pill" data-kind="ok" data-action="showSyncStatus" title="Sync status">Synced</button>
       <button id="refreshBtn" type="button" class="refresh-btn" data-action="refresh" aria-label="Refresh from cloud" title="Refresh">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -268,12 +298,32 @@
           <path d="M21 4v5h-5"/>
         </svg>
       </button>
-      <button id="txnsBtn" type="button" class="icon-btn" data-action="openTransactions" aria-label="This month's transactions" title="Transactions">
+      <button id="txnsBtn" type="button" class="icon-btn" data-action="toggleListMenu" aria-label="Open lists" title="Lists" aria-haspopup="menu">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <path d="M3 9h18M3 15h18M9 3v18"/>
         </svg>
       </button>
+
+      <!-- Lists popover — anchored under the button (not a modal). -->
+      <div class="list-pop" id="listMenu" hidden role="menu">
+        <button type="button" class="list-pop-item" data-action="openTransactions" role="menuitem">
+          <span class="lp-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+            </svg>
+          </span>
+          <span class="lp-text"><span class="lp-title">Transactions</span><span class="lp-desc">Logged this month</span></span>
+        </button>
+        <button type="button" class="list-pop-item" data-action="openWants" role="menuitem">
+          <span class="lp-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+          </span>
+          <span class="lp-text"><span class="lp-title">Needs &amp; Wants</span><span class="lp-desc">Things to buy</span></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -538,9 +588,9 @@
      functions that app.js's boot() calls at the bottom. -->
 <script src="config.js"></script>
 <script src="defaults.js?v=1"></script>
-<script src="cloud.js?v=5"></script>
+<script src="cloud.js?v=6"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=3"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>
