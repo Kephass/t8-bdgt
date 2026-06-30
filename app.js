@@ -118,6 +118,7 @@ function blankState() {
     shopping:        {},
     budgetOverrides: {},
     incomeOverrides: {},
+    savingsOverrides: {},
     wants:           [],
     flags:           {},
   };
@@ -134,6 +135,7 @@ function load() {
       shopping:        saved.shopping        || {},
       budgetOverrides: saved.budgetOverrides || {},
       incomeOverrides: saved.incomeOverrides || {},
+      savingsOverrides: saved.savingsOverrides || {},
       wants:           saved.wants           || [],
       flags:           saved.flags           || {},
     };
@@ -189,6 +191,15 @@ const derive = {
   },
   hasIncomeOverride(month = view.month) {
     return state.incomeOverrides?.[month] !== undefined;
+  },
+
+  /** Effective savings target for a month: per-month override or the global default. */
+  savings(month = view.month) {
+    const o = state.savingsOverrides?.[month];
+    return o != null ? +o : (+state.config.savings || 0);
+  },
+  hasSavingsOverride(month = view.month) {
+    return state.savingsOverrides?.[month] !== undefined;
   },
 
   /** Group totals + total spend for a month. */
@@ -274,7 +285,7 @@ function renderHeaderPicker() {
 function renderHome() {
   const t = derive.totals();
   const income  = derive.income();
-  const savings = +state.config.savings || 0;
+  const savings = derive.savings();
   const remaining = t.budgeted - t.spent;
 
   renderHomeHeroChart();
@@ -311,7 +322,7 @@ function renderSnapshotTiles() {
   // "slack / over-spend" line the old Summary card showed: positive means
   // you'd finish the month with money left if you stuck to budgets.
   const income   = derive.income();
-  const savings  = +state.config.savings || 0;
+  const savings  = derive.savings();
   const totals   = derive.totals();
   const surplus  = income - totals.budgeted - savings;
   const surplusAmtEl = $('surplusAmt');
@@ -834,8 +845,8 @@ function openOnboard(replan) {
   $('onboardSub').textContent = replan
     ? `Adjust ${monthName(view.month)}'s income or savings and I'll rebalance discretionary lines while keeping your locked bills. Other months are untouched.`
     : "Tell me what's coming in and how much you want to save. I'll keep your fixed bills locked and rebalance the rest.";
-  $('incomeInput').value = (replan ? derive.income(view.month) : state.config.income) || '';
-  $('saveInput').value   = state.config.savings || '';
+  $('incomeInput').value = (replan ? derive.income(view.month)  : state.config.income)  || '';
+  $('saveInput').value   = (replan ? derive.savings(view.month) : state.config.savings) || '';
   openModal('onboard');
 }
 function closeOnboard()  { closeModal('onboard'); }
@@ -843,19 +854,24 @@ function closeOnboard()  { closeModal('onboard'); }
 function applyOnboard() {
   const income  = parseAmount($('incomeInput').value);
   const savings = parseAmount($('saveInput').value);
-  // Initial planning sets the global default income; re-planning a month writes
-  // a per-month override so other months keep their own income. Savings stays global.
+  // Initial planning sets the global defaults; re-planning a month writes
+  // per-month overrides so other months keep their own income + savings.
   const replan = view.onboardReplan;
   commit(s => {
-    if (replan) setIncomeOverride(s, view.month, income);
-    else        s.config.income = income;
-    s.config.savings = savings;
+    if (replan) {
+      setIncomeOverride(s, view.month, income);
+      setSavingsOverride(s, view.month, savings);
+    } else {
+      s.config.income  = income;
+      s.config.savings = savings;
+    }
     rebalanceMonth(s, view.month, income, savings);
   });
   if (replan) {
-    if (derive.hasIncomeOverride(view.month)) sync.upsertIncomeOverride(view.month, income);
-    else                                      sync.deleteIncomeOverride(view.month);
-    sync.updateConfig({ savings });
+    if (derive.hasIncomeOverride(view.month))  sync.upsertIncomeOverride(view.month, income);
+    else                                       sync.deleteIncomeOverride(view.month);
+    if (derive.hasSavingsOverride(view.month)) sync.upsertSavingsOverride(view.month, savings);
+    else                                       sync.deleteSavingsOverride(view.month);
   } else {
     sync.updateConfig({ income, savings });
   }
@@ -911,6 +927,46 @@ function resetMonthIncome(e) {
   snack('Reset to default');
 }
 
+/* -- Savings sheet (per-month) -------------------------------------------- */
+/* Tapping the Home "Savings target" tile sets the savings target for
+   view.month only. The global default lives in Settings. */
+
+function openSavings() {
+  $('savingsMonthInput').value = derive.savings(view.month);
+  renderSavingsSheet();
+  openModal('savingsModal');
+}
+function closeSavings() { closeModal('savingsModal'); }
+
+function renderSavingsSheet() {
+  const m   = view.month;
+  const def = +state.config.savings || 0;
+  $('savingsSheetSub').textContent = monthName(m);
+  const help = $('savingsSheetHelp');
+  help.innerHTML = derive.hasSavingsOverride(m)
+    ? `Custom savings target for ${monthName(m)}. Default is ${fmt(def)}. ` +
+      `<a href="#" data-action="resetMonthSavings" style="color:var(--green);text-decoration:underline">Reset to default</a>`
+    : `Applies to ${monthName(m)} only — other months keep your default of ${fmt(def)}.`;
+}
+
+function saveSavings() {
+  const savings = parseAmount($('savingsMonthInput').value);
+  commit(s => setSavingsOverride(s, view.month, savings));
+  if (derive.hasSavingsOverride(view.month)) sync.upsertSavingsOverride(view.month, savings);
+  else                                       sync.deleteSavingsOverride(view.month);
+  closeSavings();
+  snack(`Savings set for ${monthName(view.month)}`);
+}
+
+function resetMonthSavings(e) {
+  e?.preventDefault();
+  commit(s => clearSavingsOverride(s, view.month));
+  sync.deleteSavingsOverride(view.month);
+  $('savingsMonthInput').value = +state.config.savings || 0;
+  renderSavingsSheet();
+  snack('Reset to default');
+}
+
 /** Per-month override helpers used by saveEdit, resetMonthBudget, rebalance. */
 function setOverride(s, catId, month, value) {
   const cat = s.categories.find(c => c.id === catId);
@@ -941,6 +997,16 @@ function setIncomeOverride(s, month, value) {
 }
 function clearIncomeOverride(s, month) {
   delete s.incomeOverrides[month];
+}
+
+/** Per-month savings override helpers. Same self-cleaning rule as income. */
+function setSavingsOverride(s, month, value) {
+  const v = +value || 0;
+  if (v === (+s.config.savings || 0)) delete s.savingsOverrides[month];
+  else                                s.savingsOverrides[month] = v;
+}
+function clearSavingsOverride(s, month) {
+  delete s.savingsOverrides[month];
 }
 
 /** Target weights for the rebalance algorithm — sum essentials = 1030, disc = 375. */
@@ -1692,6 +1758,10 @@ const ACTIONS = {
   // Per-month income sheet (tap the Home income tile)
   openIncome, closeIncome, saveIncome,
   resetMonthIncome:  e => resetMonthIncome(e),
+
+  // Per-month savings sheet (tap the Home savings tile)
+  openSavings, closeSavings, saveSavings,
+  resetMonthSavings: e => resetMonthSavings(e),
 
   // Edit category sheet
   openEdit:          (_, d) => openEdit(d.id),
