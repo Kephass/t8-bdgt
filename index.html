@@ -97,6 +97,24 @@
   </div>
 </div>
 
+<!-- INCOME (PER-MONTH) SHEET -->
+<div class="modal" id="incomeModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Income</h2>
+    <p class="sub" id="incomeSheetSub"></p>
+
+    <label class="label">Income this month</label>
+    <input class="input num-input" id="incomeMonthInput" type="text" inputmode="decimal" placeholder="1234" />
+    <p class="help" id="incomeSheetHelp" style="margin-top:6px"></p>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" data-action="closeIncome">Cancel</button>
+      <button class="btn primary btn-block" data-action="saveIncome">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT CATEGORY SHEET -->
 <div class="modal" id="editModal">
   <div class="sheet">
@@ -352,10 +370,10 @@
     <div class="card hero-chart" id="heroChart" data-action="setView" data-view="budget" role="button" aria-label="View budget detail"></div>
 
     <div class="row3">
-      <div class="stat">
+      <button type="button" class="stat" data-action="openIncome" aria-label="Set income for this month">
         <div class="k">Income</div>
         <div class="v num" id="statIncome">€0</div>
-      </div>
+      </button>
       <div class="stat">
         <div class="k">Spent</div>
         <div class="v num" id="statSpent">€0</div>
@@ -588,9 +606,9 @@
      functions that app.js's boot() calls at the bottom. -->
 <script src="config.js"></script>
 <script src="defaults.js?v=1"></script>
-<script src="cloud.js?v=6"></script>
+<script src="cloud.js?v=8"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=3"></script>
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
