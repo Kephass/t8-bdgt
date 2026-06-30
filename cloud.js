@@ -218,6 +218,7 @@ async function hydrate() {
     { data: overrides,  error: e6 },
     { data: wants,      error: e7 },
     { data: incomeOv,   error: e8 },
+    { data: savingsOv,  error: e9 },
   ] = await Promise.all([
     sb.from('households').select('income, savings, currency, cofidis').eq('id', hid).single(),
     sb.from('categories').select('*').eq('household_id', hid).order('sort_order'),
@@ -227,14 +228,16 @@ async function hydrate() {
     sb.from('budget_overrides').select('*').eq('household_id', hid),
     sb.from('wants').select('*').eq('household_id', hid),
     sb.from('income_overrides').select('month_key, amount').eq('household_id', hid),
+    sb.from('savings_overrides').select('month_key, amount').eq('household_id', hid),
   ]);
-  // Core tables are all-or-nothing. income_overrides is intentionally NOT in
-  // this list: it's a newer, supplementary table, so if it's missing (e.g. the
-  // migration hasn't been applied yet) the rest of the household still loads —
-  // per-month income just falls back to the global default until then.
+  // Core tables are all-or-nothing. income_overrides / savings_overrides are
+  // intentionally NOT in this list: they're newer, supplementary tables, so if
+  // one is missing (e.g. the migration hasn't been applied yet) the rest of the
+  // household still loads — per-month values just fall back to the global default.
   const err = e1 || e2 || e3 || e4 || e5 || e6 || e7;
   if (err) { note('hydrate', err); return; }
   if (e8) console.warn('[cloud] hydrate: income_overrides unavailable —', e8.message || e8);
+  if (e9) console.warn('[cloud] hydrate: savings_overrides unavailable —', e9.message || e9);
 
   // Reseat the in-memory state to match what came down.
   state.config = {
@@ -273,6 +276,10 @@ async function hydrate() {
   state.incomeOverrides = {};
   for (const o of (incomeOv || [])) {
     state.incomeOverrides[o.month_key] = +o.amount;
+  }
+  state.savingsOverrides = {};
+  for (const o of (savingsOv || [])) {
+    state.savingsOverrides[o.month_key] = +o.amount;
   }
   state.wants = (wants || []).map(w => ({
     id: w.id, item: w.item, done: !!w.done, boughtAt: w.bought_at || null,
@@ -459,6 +466,28 @@ const sync = {
     if (!cloud.householdId) return;
     track('deleteIncomeOverride', async () => {
       const { error } = await sb.from('income_overrides').delete()
+        .eq('household_id', cloud.householdId)
+        .eq('month_key', monthKey);
+      if (error) throw error;
+    });
+  },
+
+  // ── savings overrides ──────────────────────────────────────────────────
+  upsertSavingsOverride(monthKey, amount) {
+    if (!cloud.householdId) return;
+    track('upsertSavingsOverride', async () => {
+      const { error } = await sb.from('savings_overrides').upsert({
+        household_id: cloud.householdId,
+        month_key: monthKey,
+        amount: +amount,
+      });
+      if (error) throw error;
+    });
+  },
+  deleteSavingsOverride(monthKey) {
+    if (!cloud.householdId) return;
+    track('deleteSavingsOverride', async () => {
+      const { error } = await sb.from('savings_overrides').delete()
         .eq('household_id', cloud.householdId)
         .eq('month_key', monthKey);
       if (error) throw error;

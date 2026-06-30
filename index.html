@@ -115,6 +115,24 @@
   </div>
 </div>
 
+<!-- SAVINGS (PER-MONTH) SHEET -->
+<div class="modal" id="savingsModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Savings target</h2>
+    <p class="sub" id="savingsSheetSub"></p>
+
+    <label class="label">Savings target this month</label>
+    <input class="input num-input" id="savingsMonthInput" type="text" inputmode="decimal" placeholder="123" />
+    <p class="help" id="savingsSheetHelp" style="margin-top:6px"></p>
+
+    <div class="btn-row" style="margin:18px 0 0">
+      <button class="btn ghost btn-block" data-action="closeSavings">Cancel</button>
+      <button class="btn primary btn-block" data-action="saveSavings">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT CATEGORY SHEET -->
 <div class="modal" id="editModal">
   <div class="sheet">
@@ -379,10 +397,10 @@
         <div class="v num" id="statSpent">€0</div>
         <div class="delta" id="statSpentDelta"></div>
       </div>
-      <div class="stat">
+      <button type="button" class="stat" data-action="openSavings" aria-label="Set savings target for this month">
         <div class="k">Savings target</div>
         <div class="v num" id="statSaved">€0</div>
-      </div>
+      </button>
     </div>
 
     <div class="section">
@@ -606,9 +624,9 @@
      functions that app.js's boot() calls at the bottom. -->
 <script src="config.js"></script>
 <script src="defaults.js?v=1"></script>
-<script src="cloud.js?v=8"></script>
+<script src="cloud.js?v=9"></script>
 <script src="migrations.js?v=1"></script>
 <script src="auth-ui.js?v=3"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>
