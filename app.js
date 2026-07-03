@@ -112,11 +112,13 @@ const view = {
 function blankState() {
   return {
     config:          { income: 0, savings: 0, currency: '€', cofidis: true },
-    categories:      [],
+    categories:      [],   // base template — only the fallback seed for a month
+                           // with no snapshot of its own (see categoriesByMonth)
+    categoriesByMonth: {}, // { 'YYYY-MM': [ {id,group,name,note,budget,locked,icon,color} ] }
     entries:         {},
     meals:           {},
     shopping:        {},
-    budgetOverrides: {},
+    budgetOverrides: {},   // legacy — kept for migration reads; no longer written
     incomeOverrides: {},
     savingsOverrides: {},
     wants:           [],
@@ -131,6 +133,7 @@ function load() {
       ...blankState(), ...saved,
       config:          { ...blankState().config, ...(saved.config || {}) },
       categories:      saved.categories      || [],
+      categoriesByMonth: saved.categoriesByMonth || {},
       meals:           saved.meals           || {},
       shopping:        saved.shopping        || {},
       budgetOverrides: saved.budgetOverrides || {},
@@ -158,11 +161,40 @@ function commit(mutate, { render: doRender = true } = {}) {
   if (doRender) render();
 }
 
+/* ── Per-month categories ─────────────────────────────────────────────────
+   Each month owns its own category snapshot so editing one month never touches
+   another. A month with no snapshot inherits (read-only) from the nearest
+   EARLIER month that has one — else the base template. Snapshots are only
+   written on edit (copy-on-write via materializeMonth), so untouched months
+   cost nothing, mirroring how income/savings overrides self-clean. */
+
+/** The list a month should start from, deep-cloned so callers can mutate it:
+   the nearest earlier month's snapshot, else the base template / DEFAULTS. */
+function inheritedCategories(month, s = state) {
+  const earlier = Object.keys(s.categoriesByMonth)
+    .filter(m => m < month)
+    .sort();
+  const src = earlier.length
+    ? s.categoriesByMonth[earlier[earlier.length - 1]]
+    : (s.categories?.length ? s.categories : DEFAULTS.categories);
+  return structuredClone(src);
+}
+
+/** Copy-on-write: ensure `month` has its own snapshot before an edit, cloning
+   the inherited list on first touch. Returns the (mutable) snapshot array. */
+function materializeMonth(s, month) {
+  return (s.categoriesByMonth[month] ||= inheritedCategories(month, s));
+}
+
 /* ── 5. Migrations + seeds: see migrations.js ────────────────────────────── */
 
 /* ── 6. Derive: pure selectors over state ────────────────────────────────── */
 
 const derive = {
+  /** This month's category snapshot (or the inherited list if none yet). */
+  categories(month = view.month) {
+    return state.categoriesByMonth[month] || inheritedCategories(month);
+  },
   entries(catId, month = view.month) {
     return state.entries?.[month]?.[catId] || [];
   },
@@ -170,18 +202,14 @@ const derive = {
     return derive.entries(catId, month).reduce((sum, e) => sum + (+e.amount || 0), 0);
   },
 
-  /** Effective budget for a category in a month: per-month override or global default. */
-  budget(cat, month = view.month) {
+  /** Effective budget for a category: read straight off its month snapshot row. */
+  budget(cat) {
     if (!cat) return 0;
     if (cat.id === 'cofidis' && !state.config.cofidis) return 0;
-    const o = state.budgetOverrides?.[month]?.[cat.id];
-    return o != null ? +o : (+cat.budget || 0);
+    return +cat.budget || 0;
   },
-  budgetById(catId, month) {
-    return derive.budget(state.categories.find(c => c.id === catId), month);
-  },
-  hasOverride(catId, month = view.month) {
-    return state.budgetOverrides?.[month]?.[catId] !== undefined;
+  budgetById(catId, month = view.month) {
+    return derive.budget(derive.categories(month).find(c => c.id === catId));
   },
 
   /** Effective income for a month: per-month override or the global default. */
@@ -206,8 +234,8 @@ const derive = {
   totals(month = view.month) {
     const t = { fixed: 0, ess: 0, disc: 0, spent: 0 };
     const bucket = { fixed: 'fixed', essentials: 'ess', discretionary: 'disc' };
-    for (const cat of state.categories) {
-      t[bucket[cat.group]] += derive.budget(cat, month);
+    for (const cat of derive.categories(month)) {
+      t[bucket[cat.group]] += derive.budget(cat);
       t.spent += derive.spent(cat.id, month);
     }
     t.budgeted = t.fixed + t.ess + t.disc;
@@ -309,7 +337,7 @@ function renderHome() {
    2. Savings — the monthly target + an annualised "if kept" projection.
    The savings actuals aren't tracked yet so the bar is informational only. */
 function renderSnapshotTiles() {
-  const fixed = state.categories.filter(c => c.group === 'fixed');
+  const fixed = derive.categories().filter(c => c.group === 'fixed');
   const fixedBudget = fixed.reduce((t, c) => t + derive.budget(c), 0);
   const fixedSpent  = fixed.reduce((t, c) => t + derive.spent(c.id), 0);
   const fixedLeft   = Math.max(0, fixedBudget - fixedSpent);
@@ -459,7 +487,7 @@ function renderHomeHeroChart() {
    Tap a row to jump to the Budget tab with that group filtered. */
 function categoryGroupSummary(group) {
   const labels = { fixed: 'Non-negotiables', essentials: 'Food & essentials', discretionary: 'Discretionary' };
-  const cats = state.categories.filter(c => c.group === group);
+  const cats = derive.categories().filter(c => c.group === group);
   let budgetSum = 0, spentSum = 0;
   for (const c of cats) {
     budgetSum += derive.budget(c);
@@ -490,8 +518,8 @@ function renderBudgetView() {
     c.classList.toggle('active', c.dataset.filter === view.budgetFilter);
   }
   const cats = view.budgetFilter === 'all'
-    ? state.categories
-    : state.categories.filter(c => c.group === view.budgetFilter);
+    ? derive.categories()
+    : derive.categories().filter(c => c.group === view.budgetFilter);
   const t = derive.totals();
   $('budgetRight').textContent  = `${fmt(t.spent)} / ${fmt(t.budgeted)}`;
   const monthLbl = $('budgetMonthLabel');
@@ -761,10 +789,13 @@ function renderEditEntries(cat) {
 
 function renderEditBudgetScope(cat) {
   const monthLbl = monthName(view.month);
-  if (derive.hasOverride(cat.id)) {
+  const inherited = inheritedCategories(view.month).find(c => c.id === cat.id);
+  const base = inherited ? (+inherited.budget || 0) : (+cat.budget || 0);
+  const current = +cat.budget || 0;
+  if (current !== base) {
     $('editBudgetScope').innerHTML = `· <span style="color:var(--amber)">Custom for ${escapeHtml(monthLbl)}</span>`;
     $('editBudgetHelp').innerHTML  =
-      `Default is ${fmt(+cat.budget || 0)}. <a href="#" data-action="resetMonthBudget" style="color:var(--green);text-decoration:underline">Reset to default</a>`;
+      `Carried-forward default is ${fmt(base)}. <a href="#" data-action="resetMonthBudget" style="color:var(--green);text-decoration:underline">Reset to default</a>`;
   } else {
     $('editBudgetScope').innerHTML = `· <span style="color:var(--text-dim)">${escapeHtml(monthLbl)} only</span>`;
     $('editBudgetHelp').textContent = `Edits apply to ${monthLbl} only. Other months keep their own budget.`;
@@ -772,7 +803,7 @@ function renderEditBudgetScope(cat) {
 }
 
 function editingCategory() {
-  return state.categories.find(c => c.id === view.editId) || null;
+  return derive.categories().find(c => c.id === view.editId) || null;
 }
 
 /* ── 9. Actions — the only callers of commit() ──────────────────────────── */
@@ -875,14 +906,9 @@ function applyOnboard() {
   } else {
     sync.updateConfig({ income, savings });
   }
-  // Push every override for this month so DB matches the rebalanced state.
-  for (const cat of state.categories) {
-    if (derive.hasOverride(cat.id)) {
-      sync.upsertOverride(view.month, cat.id, state.budgetOverrides[view.month][cat.id]);
-    } else {
-      sync.deleteOverride(view.month, cat.id);
-    }
-  }
+  // Push this month's rebalanced snapshot so the DB matches.
+  (state.categoriesByMonth[view.month] || []).forEach((cat, i) =>
+    sync.upsertMonthlyCategory(view.month, cat, i));
   closeOnboard();
   snack(`${monthName(view.month)} rebalanced`);
 }
@@ -967,29 +993,8 @@ function resetMonthSavings(e) {
   snack('Reset to default');
 }
 
-/** Per-month override helpers used by saveEdit, resetMonthBudget, rebalance. */
-function setOverride(s, catId, month, value) {
-  const cat = s.categories.find(c => c.id === catId);
-  if (!cat) return;
-  const v = +value || 0;
-  if (v === (+cat.budget || 0)) {
-    // Matches the default — no override needed
-    if (s.budgetOverrides[month]) {
-      delete s.budgetOverrides[month][catId];
-      if (!Object.keys(s.budgetOverrides[month]).length) delete s.budgetOverrides[month];
-    }
-  } else {
-    (s.budgetOverrides[month] ||= {})[catId] = v;
-  }
-}
-function clearOverride(s, catId, month) {
-  if (!s.budgetOverrides[month]) return;
-  delete s.budgetOverrides[month][catId];
-  if (!Object.keys(s.budgetOverrides[month]).length) delete s.budgetOverrides[month];
-}
-
-/** Per-month income override helpers. Mirrors setOverride: a value equal to the
-   global default self-cleans, so an override only exists while it differs. */
+/** Per-month income override helpers. A value equal to the global default
+   self-cleans, so an override only exists while it differs. */
 function setIncomeOverride(s, month, value) {
   const v = +value || 0;
   if (v === (+s.config.income || 0)) delete s.incomeOverrides[month];
@@ -1017,15 +1022,16 @@ const FLEX_DEFAULTS = {
 
 /** Auto-balance flex categories for one month to fit (income − savings − locked). */
 function rebalanceMonth(s, month, income, savings) {
-  const set = (catId, value) => setOverride(s, catId, month, value);
+  const list = materializeMonth(s, month);
+  const set = (catId, value) => { const c = list.find(x => x.id === catId); if (c) c.budget = +value || 0; };
   const sumValues = obj => Object.values(obj).reduce((a, b) => a + b, 0);
 
-  const lockedTotal = s.categories
+  const lockedTotal = list
     .filter(c => c.locked)
-    .reduce((total, c) => total + derive.budget(c, month), 0);
+    .reduce((total, c) => total + derive.budget(c), 0);
   const available = income - savings - lockedTotal;
 
-  const flexCats = s.categories.filter(c => !c.locked);
+  const flexCats = list.filter(c => !c.locked);
   const baseEss  = sumValues(FLEX_DEFAULTS.essentials);     // 1030
   const baseDisc = sumValues(FLEX_DEFAULTS.discretionary);  // 375
   const defFor   = c => FLEX_DEFAULTS[c.group]?.[c.id] ?? (+c.budget || 0);
@@ -1076,7 +1082,7 @@ function rebalanceMonth(s, month, income, savings) {
 /* -- Edit sheet (per-category) -------------------------------------------- */
 
 function openEdit(id) {
-  const cat = state.categories.find(c => c.id === id);
+  const cat = derive.categories().find(c => c.id === id);
   if (!cat) return;
   view.editId = id;
   $('editAmount').value = derive.budget(cat);
@@ -1099,25 +1105,32 @@ function saveEdit() {
   const note   = $('editNote').value;
   const locked = $('editLock').classList.contains('on');
   commit(s => {
-    setOverride(s, cat.id, view.month, budget);
-    const c = s.categories.find(x => x.id === cat.id);
+    const c = materializeMonth(s, view.month).find(x => x.id === cat.id);
+    if (!c) return;
+    c.budget = budget;
     c.note   = note;
     c.locked = locked;
   });
-  const updated = state.categories.find(c => c.id === cat.id);
-  sync.upsertCategory(updated);
-  if (derive.hasOverride(cat.id)) sync.upsertOverride(view.month, cat.id, budget);
-  else                            sync.deleteOverride(view.month, cat.id);
+  const updated = state.categoriesByMonth[view.month].find(c => c.id === cat.id);
+  if (updated) sync.upsertMonthlyCategory(view.month, updated);
   closeEdit();
   snack('Saved');
 }
 
+// "Reset to default" = back to the carried-forward value (nearest earlier month
+// / base template), applied to this month's snapshot only.
 function resetMonthBudget(e) {
   e?.preventDefault();
   const cat = editingCategory(); if (!cat) return;
-  commit(s => clearOverride(s, cat.id, view.month));
-  sync.deleteOverride(view.month, cat.id);
-  $('editAmount').value = +cat.budget || 0;
+  const inherited = inheritedCategories(view.month).find(c => c.id === cat.id);
+  const base = inherited ? (+inherited.budget || 0) : (+cat.budget || 0);
+  commit(s => {
+    const c = materializeMonth(s, view.month).find(x => x.id === cat.id);
+    if (c) c.budget = base;
+  });
+  const updated = state.categoriesByMonth[view.month].find(c => c.id === cat.id);
+  if (updated) sync.upsertMonthlyCategory(view.month, updated);
+  $('editAmount').value = base;
   snack('Reset to default');
 }
 
@@ -1127,7 +1140,7 @@ function resetMonthBudget(e) {
    edit sheet is open behind it (the FAB quick-log path skips the edit sheet),
    so the target category is tracked on `view.addTxnCat`, not `view.editId`. */
 function openAddTxn(catId) {
-  const cat = state.categories.find(c => c.id === catId);
+  const cat = derive.categories().find(c => c.id === catId);
   if (!cat) return;
   view.addTxnCat = catId;
 
@@ -1156,7 +1169,7 @@ function closeAddTxn() { closeModal('addTxnModal'); view.addTxnCat = null; }
    dated outside view.month still lands correctly. */
 function addTransaction() {
   const catId = view.addTxnCat;
-  const cat = state.categories.find(c => c.id === catId);
+  const cat = derive.categories().find(c => c.id === catId);
   if (!cat) return;
   const amount = parseAmount($('txnAmount').value);
   if (!amount || amount <= 0) { snack('Enter an amount'); return; }
@@ -1195,11 +1208,16 @@ async function deleteCategory() {
     confirmLabel: 'Delete', danger: true,
   });
   if (!ok) return;
+  // Per-month delete: drop the category from THIS month's snapshot (and this
+  // month's entries for it) only. Other months keep their own copy.
+  const entryIds = derive.entries(cat.id, view.month).map(e => e.id);
   commit(s => {
-    s.categories = s.categories.filter(c => c.id !== cat.id);
-    for (const m in s.entries) delete s.entries[m][cat.id];
+    s.categoriesByMonth[view.month] =
+      materializeMonth(s, view.month).filter(c => c.id !== cat.id);
+    if (s.entries[view.month]) delete s.entries[view.month][cat.id];
   });
-  sync.deleteCategory(cat.id);   // CASCADE in DB cleans entries + overrides
+  sync.deleteMonthlyCategory(view.month, cat.id);
+  entryIds.forEach(id => sync.deleteEntry(id));
   closeEdit();
   snack('Removed');
 }
@@ -1210,9 +1228,10 @@ function openQuickLog() {
   // Frequently logged first, then everything non-fixed; dedup by id.
   const priority = ['groceries','restaurants','shopping','fuel','drogist','health','clothing','familyp2p','kids','hair','atm','travel'];
   const seen = new Set();
+  const cats = derive.categories();
   const ordered = [
-    ...priority.map(id => state.categories.find(c => c.id === id)).filter(Boolean),
-    ...state.categories.filter(c => c.group !== 'fixed'),
+    ...priority.map(id => cats.find(c => c.id === id)).filter(Boolean),
+    ...cats.filter(c => c.group !== 'fixed'),
   ].filter(c => !seen.has(c.id) && seen.add(c.id));
   $('pickerGrid').innerHTML = ordered.map(c => `
     <div class="picker-cell" data-action="pickCategory" data-id="${c.id}">
@@ -1244,9 +1263,10 @@ function renderTransactions() {
   $('txnsSub').textContent = `Entries logged in ${monthName(month)}.`;
 
   const byCat = state.entries?.[month] || {};
+  const monthCats = derive.categories(month);
   const rows = [];
   for (const catId in byCat) {
-    const cat = state.categories.find(c => c.id === catId);
+    const cat = monthCats.find(c => c.id === catId);
     for (const e of byCat[catId]) rows.push({ e, cat, catId });
   }
   rows.sort((a, b) => byNewest(a.e, b.e));
@@ -1378,8 +1398,9 @@ function saveAdd() {
     icon:   '•',
     color:  'grey',
   };
-  commit(s => s.categories.push(cat));
-  sync.upsertCategory(cat, state.categories.length - 1);
+  commit(s => materializeMonth(s, view.month).push(cat));
+  const list = state.categoriesByMonth[view.month];
+  sync.upsertMonthlyCategory(view.month, cat, list.length - 1);
   closeAdd();
   snack('Added');
 }
@@ -1679,20 +1700,18 @@ async function refresh() {
 
 async function resetPlan() {
   const ok = await confirmModal({
-    title: 'Reset all budgets to defaults?',
-    message: 'Every budget amount goes back to the seeded defaults. Meal plans and shopping list are kept.',
+    title: 'Reset this month to defaults?',
+    message: `${monthName(view.month)}'s budgets go back to the seeded defaults. Other months, meal plans and the shopping list are kept.`,
     confirmLabel: 'Reset plan', danger: true,
   });
   if (!ok) return;
   const defaults = structuredClone(DEFAULTS.categories);
   const defaultIds = new Set(defaults.map(c => c.id));
-  // Delete categories the user added that aren't in DEFAULTS.
-  for (const cat of state.categories) {
-    if (!defaultIds.has(cat.id)) sync.deleteCategory(cat.id);
-  }
-  commit(s => { s.categories = defaults; });
-  // Re-upsert every default category to restore canonical values.
-  defaults.forEach((cat, i) => sync.upsertCategory(cat, i));
+  // Categories the user added this month that aren't in DEFAULTS get dropped.
+  const removed = derive.categories().filter(c => !defaultIds.has(c.id)).map(c => c.id);
+  commit(s => { s.categoriesByMonth[view.month] = defaults; });
+  removed.forEach(id => sync.deleteMonthlyCategory(view.month, id));
+  defaults.forEach((cat, i) => sync.upsertMonthlyCategory(view.month, cat, i));
   snack('Plan reset');
 }
 async function hardReset() {

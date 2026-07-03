@@ -15,6 +15,42 @@
 function runMigrations() {
   migrateActuals();
   migrateShopping();
+  migrateCategoriesPerMonth();
+}
+
+/** Categories used to be a single global list shared by every month, so editing
+   one month retroactively changed the others. Snapshot the current global list
+   into every month that already has data, baking in each month's EFFECTIVE
+   budget (per-month override → base) so completed months keep their numbers.
+   Idempotent + guarded; safe to run every boot. Shared with cloud hydrate via
+   buildMonthlySnapshots so cloud-synced households migrate the same way. */
+function migrateCategoriesPerMonth() {
+  if (state.flags.categoriesByMonth) return;
+  buildMonthlySnapshots(state);
+  state.flags.categoriesByMonth = true;
+  save();
+}
+
+/** Populate `s.categoriesByMonth` from the legacy global `categories` +
+   `budgetOverrides`, for every month that has data (plus the current month).
+   Only fills months without a snapshot. Returns the month keys it created. */
+function buildMonthlySnapshots(s) {
+  s.categoriesByMonth ||= {};
+  const months = new Set([
+    ...Object.keys(s.entries || {}),
+    ...Object.keys(s.budgetOverrides || {}),
+    thisMonth(),
+  ]);
+  const created = [];
+  for (const m of months) {
+    if (s.categoriesByMonth[m]) continue;
+    s.categoriesByMonth[m] = (s.categories || []).map(c => {
+      const ov = s.budgetOverrides?.[m]?.[c.id];
+      return { ...c, budget: ov != null ? +ov : (+c.budget || 0) };
+    });
+    created.push(m);
+  }
+  return created;
 }
 
 /** Legacy { actuals[month][catId] = amount } → explicit entries. */

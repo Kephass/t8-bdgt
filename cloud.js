@@ -219,6 +219,7 @@ async function hydrate() {
     { data: wants,      error: e7 },
     { data: incomeOv,   error: e8 },
     { data: savingsOv,  error: e9 },
+    { data: monthlyCats, error: e10 },
   ] = await Promise.all([
     sb.from('households').select('income, savings, currency, cofidis').eq('id', hid).single(),
     sb.from('categories').select('*').eq('household_id', hid).order('sort_order'),
@@ -229,15 +230,18 @@ async function hydrate() {
     sb.from('wants').select('*').eq('household_id', hid),
     sb.from('income_overrides').select('month_key, amount').eq('household_id', hid),
     sb.from('savings_overrides').select('month_key, amount').eq('household_id', hid),
+    sb.from('monthly_categories').select('*').eq('household_id', hid).order('sort_order'),
   ]);
-  // Core tables are all-or-nothing. income_overrides / savings_overrides are
-  // intentionally NOT in this list: they're newer, supplementary tables, so if
-  // one is missing (e.g. the migration hasn't been applied yet) the rest of the
-  // household still loads — per-month values just fall back to the global default.
+  // Core tables are all-or-nothing. income_overrides / savings_overrides /
+  // monthly_categories are intentionally NOT in this list: they're newer,
+  // supplementary tables, so if one is missing (e.g. the migration hasn't been
+  // applied yet) the rest of the household still loads — per-month values just
+  // fall back to the legacy global list / defaults.
   const err = e1 || e2 || e3 || e4 || e5 || e6 || e7;
   if (err) { note('hydrate', err); return; }
   if (e8) console.warn('[cloud] hydrate: income_overrides unavailable —', e8.message || e8);
   if (e9) console.warn('[cloud] hydrate: savings_overrides unavailable —', e9.message || e9);
+  if (e10) console.warn('[cloud] hydrate: monthly_categories unavailable —', e10.message || e10);
 
   // Reseat the in-memory state to match what came down.
   state.config = {
@@ -280,6 +284,30 @@ async function hydrate() {
   state.savingsOverrides = {};
   for (const o of (savingsOv || [])) {
     state.savingsOverrides[o.month_key] = +o.amount;
+  }
+  // Per-month category snapshots. Rows arrive ordered by sort_order (see query),
+  // so pushing preserves each month's category order.
+  state.categoriesByMonth = {};
+  for (const mc of (monthlyCats || [])) {
+    (state.categoriesByMonth[mc.month_key] ||= []).push({
+      id: mc.id, group: mc.group, name: mc.name, note: mc.note || '',
+      budget: +mc.budget || 0, locked: !!mc.locked,
+      icon: mc.icon || '•', color: mc.color || 'grey',
+    });
+  }
+  // No cloud snapshots yet — either the table is missing (migration not applied)
+  // or it's empty (first load after the feature ships). Either way, rebuild the
+  // snapshots locally from the legacy global list + budget overrides, baking in
+  // each month's effective budget so numbers stay correct. When the table DOES
+  // exist, also push them up (once) so every device shares the same history.
+  if (!monthlyCats || monthlyCats.length === 0) {
+    const created = buildMonthlySnapshots(state);
+    if (!e10) {
+      for (const m of created) {
+        state.categoriesByMonth[m].forEach((cat, i) => sync.upsertMonthlyCategory(m, cat, i));
+      }
+      state.flags.categoriesByMonth = true;
+    }
   }
   state.wants = (wants || []).map(w => ({
     id: w.id, item: w.item, done: !!w.done, boughtAt: w.bought_at || null,
@@ -328,6 +356,38 @@ const sync = {
     track('deleteCategory', async () => {
       const { error } = await sb.from('categories')
         .delete().eq('household_id', cloud.householdId).eq('id', catId);
+      if (error) throw error;
+    });
+  },
+
+  // ── monthly categories (per-month snapshot; see app.js categoriesByMonth) ─
+  upsertMonthlyCategory(monthKey, cat, sortOrder = null) {
+    if (!cloud.householdId) return;
+    const row = {
+      household_id: cloud.householdId,
+      month_key: monthKey,
+      id:     cat.id,
+      group:  cat.group,
+      name:   cat.name,
+      note:   cat.note || '',
+      budget: +cat.budget || 0,
+      locked: !!cat.locked,
+      icon:   cat.icon || '•',
+      color:  cat.color || 'grey',
+    };
+    if (sortOrder != null) row.sort_order = sortOrder;
+    track('upsertMonthlyCategory', async () => {
+      const { error } = await sb.from('monthly_categories').upsert(row);
+      if (error) throw error;
+    });
+  },
+  deleteMonthlyCategory(monthKey, catId) {
+    if (!cloud.householdId) return;
+    track('deleteMonthlyCategory', async () => {
+      const { error } = await sb.from('monthly_categories').delete()
+        .eq('household_id', cloud.householdId)
+        .eq('month_key', monthKey)
+        .eq('id', catId);
       if (error) throw error;
     });
   },
