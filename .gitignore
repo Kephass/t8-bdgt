@@ -14,6 +14,9 @@
 __pycache__/
 *.pyc
 
+# Supabase CLI local link state (per-machine; not for sharing)
+supabase/.temp/
+
 # NOTE: config.js IS committed. It holds only the Supabase URL + publishable
 # key — both designed to ship in client code. RLS in the database protects
 # data, not the key itself. If you ever swap in an `sb_secret_…` key,
