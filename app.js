@@ -78,12 +78,26 @@ function shiftMonth(key, delta) {
   return monthKey(new Date(y, m - 1 + delta, 15));
 }
 
-/** Monday 00:00 of the week containing `date`. */
-function mondayOf(date) {
-  const d = new Date(date);
-  d.setDate(d.getDate() - (d.getDay() + 6) % 7);   // Mon=0 … Sun=6
-  d.setHours(0, 0, 0, 0);
-  return d;
+/** Shopping-list / dinner-planner week bucket ('1'–'4') for a date, by its
+   day-of-month. Mirrors SHOP_WEEK_START: 1–7 → '1', 8–14 → '2', 15–21 → '3',
+   22+ → '4'. Both the shopping list and the dinner planner share these buckets,
+   so a "week" is always confined to a single month. */
+function shopWeekOf(date) {
+  const day = new Date(date).getDate();
+  if (day >= SHOP_WEEK_START[4]) return '4';
+  if (day >= SHOP_WEEK_START[3]) return '3';
+  if (day >= SHOP_WEEK_START[2]) return '2';
+  return '1';
+}
+
+/** The Date objects in a week bucket, within a month. 7 days for weeks 1–3;
+   week 4 runs from day 22 to month-end (7–10 days). */
+function weekDays(week = view.shopWeek, month = view.month) {
+  const [y, m] = month.split('-').map(Number);
+  const { start, end } = derive.shopWeekRange(week, month);
+  const days = [];
+  for (let d = start; d <= end; d++) days.push(new Date(y, m - 1, d));
+  return days;
 }
 
 /* ── 4. Store: state, view, persistence, commit ──────────────────────────── */
@@ -102,8 +116,7 @@ let state = load();
 const view = {
   screen:       'home',
   month:        thisMonth(),
-  week:         mondayOf(new Date()),
-  shopWeek:     '1',
+  shopWeek:     shopWeekOf(new Date()),   // the week bucket containing today
   editId:       null,
   ctxId:        null,
   budgetFilter: 'all',   // all | fixed | essentials | discretionary
@@ -677,30 +690,27 @@ function renderMealChips() {
 }
 
 function renderWeekNav() {
-  const start = view.week;
-  const end = new Date(start); end.setDate(end.getDate() + 6);
-  const startLbl = start.toLocaleString('en-US', { month: 'short', day: 'numeric' });
-  const endLbl   = start.getMonth() === end.getMonth()
-    ? end.toLocaleString('en-US', { day: 'numeric' })
-    : end.toLocaleString('en-US', { month: 'short', day: 'numeric' });
-  $('weekLabel').textContent = `${startLbl} – ${endLbl}, ${start.getFullYear()}`;
+  const n = view.shopWeek;
+  const days = weekDays(n);
+  const first = days[0], last = days[days.length - 1];
+  const startLbl = first.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  const endLbl   = last.toLocaleString('en-US', { day: 'numeric' });
+  $('weekLabel').textContent = `${startLbl} – ${endLbl}`;
 
-  const offset = Math.round((start - mondayOf(new Date())) / (7 * 86400000));
+  // "This week" only means something in the live month; otherwise name the bucket.
+  const isCurrent = view.month === thisMonth() && shopWeekOf(new Date()) === n;
   const sub = $('weekSub');
-  sub.textContent = relativeWeekLabel(offset);
-  sub.classList.toggle('is-current', offset === 0);
-}
-function relativeWeekLabel(n) {
-  if (n === 0)  return 'This week';
-  if (n === -1) return 'Last week';
-  if (n === 1)  return 'Next week';
-  return n < 0 ? `${-n} weeks ago` : `In ${n} weeks`;
+  sub.textContent = isCurrent ? 'This week' : `Week ${n}`;
+  sub.classList.toggle('is-current', isCurrent);
+
+  // Buckets are month-gated: no stepping past week 1 or week 4.
+  $('weekPrev').disabled = n === '1';
+  $('weekNext').disabled = n === '4';
 }
 
 function renderDinnerWeek() {
   const todayKey = today();
-  const rows = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(view.week); d.setDate(d.getDate() + i);
+  const rows = weekDays().map(d => {
     const key  = dayKey(d);
     const when = key === todayKey ? 'is-today' : key < todayKey ? 'is-past' : '';
     const dinner = state.meals?.[key]?.dinner || '';
@@ -1400,6 +1410,10 @@ function saveAdd() {
   };
   commit(s => materializeMonth(s, view.month).push(cat));
   const list = state.categoriesByMonth[view.month];
+  // Register the category identity in the global `categories` table too: entries
+  // FK to categories(household_id, id), so an entry logged against a category that
+  // lives only in monthly_categories would violate the FK. See migration 0008.
+  sync.upsertCategory(cat, list.length - 1);
   sync.upsertMonthlyCategory(view.month, cat, list.length - 1);
   closeAdd();
   snack('Added');
@@ -1505,28 +1519,34 @@ function openMonthPicker() {
 /* -- Dinner planner ------------------------------------------------------- */
 
 function stepWeek(delta) {
-  const d = new Date(view.week); d.setDate(d.getDate() + delta * 7);
-  view.week = d;
+  // Weeks are month-gated buckets 1–4; clamp instead of crossing the month.
+  const n = Math.min(4, Math.max(1, Number(view.shopWeek) + delta));
+  view.shopWeek = String(n);
   renderFoodView();
 }
 function goToCurrentWeek() {
-  view.week = mondayOf(new Date());
-  renderFoodView();
+  view.month = thisMonth();
+  view.shopWeek = shopWeekOf(new Date());
+  render();   // month may have changed → refresh the whole view
   snack('This week');
 }
 
-/** Copy each day's dinner from the previous week into the current week's
-   same day-of-week. Skips days that already have a dinner set. */
+/** Copy each dinner from the previous week bucket into this week's bucket by
+   position (day 1↔day 1, …). Skips days that already have a dinner set.
+   Week 1 has no earlier bucket in the month, so there's nothing to copy. */
 function copyLastWeek() {
+  const cur = Number(view.shopWeek);
+  if (cur === 1) { snack('No earlier week this month'); return; }
+  const curDays  = weekDays(String(cur));
+  const prevDays = weekDays(String(cur - 1));
+  const dayKeys = curDays.map((d, i) => ({
+    curKey:  dayKey(d),
+    prevKey: prevDays[i] ? dayKey(prevDays[i]) : null,
+  }));
   let count = 0;
-  const dayKeys = [];
-  for (let i = 0; i < 7; i++) {
-    const cur = new Date(view.week);  cur.setDate(cur.getDate() + i);
-    const prev = new Date(view.week); prev.setDate(prev.getDate() - 7 + i);
-    dayKeys.push({ curKey: dayKey(cur), prevKey: dayKey(prev) });
-  }
   commit(s => {
     for (const { curKey, prevKey } of dayKeys) {
+      if (!prevKey) continue;
       const prevDinner = (s.meals[prevKey]?.dinner || '').trim();
       const curDinner  = (s.meals[curKey]?.dinner || '').trim();
       if (prevDinner && !curDinner) {
@@ -1547,8 +1567,7 @@ function quickAddMeal(meal) {
   if (!meal) return;
   let filledKey = null;
   commit(s => {
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(view.week); d.setDate(d.getDate() + i);
+    for (const d of weekDays()) {
       const key = dayKey(d);
       if (!(s.meals[key]?.dinner || '').trim()) {
         (s.meals[key] = s.meals[key] || {}).dinner = meal;
@@ -1591,8 +1610,9 @@ function saveDinner(textarea) {
 
 function setShopWeek(week) {
   view.shopWeek = String(week);
-  renderShopTabs();
-  renderShoppingList();
+  // The shopping tabs and the dinner planner share one week bucket, so moving
+  // the tab moves the planner and week nav too.
+  renderFoodView();
 }
 
 /** Get-or-create the weekly bucket inside a mutator. */
